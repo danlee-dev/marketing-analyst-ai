@@ -101,7 +101,7 @@ const xToken = (id: string) => ((Number(id) / 1e15) * Math.PI).toString(36).repl
 async function xPost(id: string): Promise<Collected> {
   const t = await getJson<Raw>(`https://cdn.syndication.twimg.com/tweet-result?id=${id}&lang=ko&token=${xToken(id)}`);
   if (!t || t.__typename === "TweetTombstone" || !t.user) throw new CollectError("글을 찾을 수 없어요 (삭제됐거나 비공개)", 404);
-  const text: string = (t.note_tweet?.text ?? t.text ?? "").replace(/\s*https:\/\/t\.co\/\w+$/g, "").trim();
+  const text: string = (t.note_tweet?.text ?? t.text ?? "").replace(/\s*https?:\/\/t\.co\/\w+/g, "").trim();
   const media: RemoteMedia[] = (t.mediaDetails ?? []).map((m: Raw) => {
     if (m.type === "video" || m.type === "animated_gif") {
       const mp4 = (m.video_info?.variants ?? [])
