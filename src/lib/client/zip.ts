@@ -1,7 +1,7 @@
 import { Zip, ZipDeflate, ZipPassThrough, strToU8 } from "fflate";
 import { fileUrl } from "./api";
 import { folderName, fmtTime, KIND_LABEL, kstDate, safeName } from "@/lib/naming";
-import type { Post, Transcript } from "@/lib/types";
+import type { Folder, Post, Transcript } from "@/lib/types";
 
 const n = (v: number | null | undefined) => (v == null ? "-" : v.toLocaleString("ko-KR"));
 const kst = (iso: string) =>
@@ -34,13 +34,14 @@ export function postMarkdown(post: Post): string {
     `- 링크: ${post.url}`,
     `- 계정: @${a.username}${a.fullName ? ` (${a.fullName})` : ""}${a.isVerified ? " 인증됨" : ""}`,
     `- 프로필: ${a.profileUrl}`,
-    `- 게시일: ${kst(post.takenAt)}`,
+    `- 게시일: ${kst(post.taken_at)}`,
     `- 형식: ${post.type === "carousel" ? `캐러셀 ${post.media.length}장` : post.type === "video" ? "릴스/영상" : "사진"}`,
     `- 좋아요 ${n(post.likes)} · 댓글 ${n(post.comments)}${post.views != null ? ` · 조회 ${n(post.views)}` : ""}`,
     post.music ? `- 음악: ${post.music}` : "",
     post.location ? `- 위치: ${post.location}` : "",
     post.hashtags.length ? `- 해시태그: ${post.hashtags.join(" ")}` : "",
     "",
+    post.note ? `## 메모\n\n${post.note}\n` : "",
     "## 캡션",
     "",
     post.caption || "(캡션 없음)",
@@ -66,13 +67,30 @@ function indexMarkdown(posts: Post[], folders: string[]): string {
     "",
     ...posts.map(
       (p, i) =>
-        `${i + 1}. ${folders[i]}/ — @${p.account.username} · ${p.type === "carousel" ? `캐러셀 ${p.media.length}장` : p.type === "video" ? "영상" : "사진"} · ${p.url}`,
+        `${i + 1}. ${folders[i]}/ - @${p.account.username} · ${p.type === "carousel" ? `캐러셀 ${p.media.length}장` : p.type === "video" ? "영상" : "사진"} · ${p.url}`,
     ),
     "",
   ].join("\n");
 }
 
-export async function downloadZip(posts: Post[], onProgress: (done: number, total: number) => void) {
+// 폴더 id -> "상위/하위" 경로
+function folderPaths(folders: Folder[]) {
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  const path = (id: string, seen = new Set<string>()): string => {
+    const f = byId.get(id);
+    if (!f || seen.has(id)) return "";
+    seen.add(id);
+    const parent = f.parent_id ? path(f.parent_id, seen) : "";
+    return parent ? `${parent}/${safeName(f.name, 40)}` : safeName(f.name, 40);
+  };
+  return path;
+}
+
+export async function downloadZip(
+  posts: Post[],
+  ctx: { projectName: string; folders: Folder[] },
+  onProgress: (done: number, total: number) => void,
+) {
   const chunks: Uint8Array[] = [];
   let failed: unknown = null;
   const zip = new Zip((err, chunk) => {
@@ -86,18 +104,20 @@ export async function downloadZip(posts: Post[], onProgress: (done: number, tota
   };
   const addBinary = async (name: string, path: string) => {
     const res = await fetch(fileUrl(path));
-    if (!res.ok) throw new Error(`${name} 다운로드 실패`);
+    if (!res.ok) throw new Error(`${name.split("/").pop()} 다운로드 실패`);
     const f = new ZipPassThrough(name);
     zip.add(f);
     f.push(new Uint8Array(await res.arrayBuffer()), true);
   };
 
-  const date = kstDate(new Date().toISOString());
-  const root = posts.length === 1 ? folderName(posts[0]) : `인스타레퍼런스_${date}_${posts.length}개`;
-  // 같은 이름 폴더가 겹치지 않게
+  const single = posts.length === 1;
+  const root = single ? folderName(posts[0]) : `${safeName(ctx.projectName, 40)}_${kstDate(new Date().toISOString())}_${posts.length}개`;
+  const fpath = folderPaths(ctx.folders);
   const used = new Map<string, number>();
-  const folders = posts.map((p) => {
-    const base = folderName(p);
+  const dirs = posts.map((p) => {
+    if (single) return root;
+    const sub = p.folder_id ? fpath(p.folder_id) : "";
+    const base = `${root}/${sub ? sub + "/" : ""}${folderName(p)}`;
     const k = (used.get(base) ?? 0) + 1;
     used.set(base, k);
     return k > 1 ? `${base}_${k}` : base;
@@ -106,10 +126,10 @@ export async function downloadZip(posts: Post[], onProgress: (done: number, tota
   const total = posts.reduce((s, p) => s + p.media.length + p.attachments.length, 0);
   let done = 0;
   onProgress(0, total);
-  if (posts.length > 1) addText(`${root}/INDEX.md`, indexMarkdown(posts, folders));
+  if (!single) addText(`${root}/INDEX.md`, indexMarkdown(posts, dirs.map((d) => d.slice(root.length + 1))));
 
   for (const [i, post] of posts.entries()) {
-    const dir = posts.length > 1 ? `${root}/${folders[i]}` : root;
+    const dir = dirs[i];
     addText(`${dir}/post.md`, postMarkdown(post));
     addText(`${dir}/caption.txt`, `@${post.account.username}\n${post.url}\n\n${post.caption}\n`);
     if (post.transcripts.length) addText(`${dir}/transcript.txt`, post.transcripts.map((t) => transcriptText(post, t)).join("\n"));

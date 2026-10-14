@@ -1,39 +1,37 @@
-import { del } from "@vercel/blob";
-import { deletePrefix, postDir, readPost, writePost } from "@/lib/blob";
+import { deleteFile, deletePrefix, postDir } from "@/lib/blob";
+import { requireUser } from "@/lib/supabase/server";
 import type { Attachment } from "@/lib/types";
 
-export async function GET(_req: Request, ctx: RouteContext<"/api/posts/[id]">) {
-  const post = await readPost((await ctx.params).id);
-  return post ? Response.json({ post }) : Response.json({ error: "없음" }, { status: 404 });
-}
-
-type Patch = { title?: string; addAttachments?: Attachment[]; removeAttachment?: string };
-
+// 첨부 하나 지우기 (Blob 파일도 같이)
 export async function PATCH(request: Request, ctx: RouteContext<"/api/posts/[id]">) {
   const { id } = await ctx.params;
-  const post = await readPost(id);
-  if (!post) return Response.json({ error: "없음" }, { status: 404 });
-  const body = (await request.json()) as Patch;
+  const { supabase, user } = await requireUser();
+  if (!user) return Response.json({ error: "로그인이 필요해요" }, { status: 401 });
+  const { removeAttachment } = (await request.json()) as { removeAttachment?: string };
 
-  if (typeof body.title === "string" && body.title.trim()) post.title = body.title.trim().slice(0, 80);
-  if (body.addAttachments?.length) {
-    const prefix = `${postDir(id)}attachments/`;
-    for (const a of body.addAttachments) {
-      if (!a.path.startsWith(prefix)) continue;
-      post.attachments = post.attachments.filter((x) => x.path !== a.path).concat(a);
-    }
-  }
-  if (body.removeAttachment) {
-    const target = post.attachments.find((a) => a.path === body.removeAttachment);
-    if (target) {
-      await del(target.path).catch(() => {});
-      post.attachments = post.attachments.filter((a) => a.path !== target.path);
-    }
-  }
-  return Response.json({ post: await writePost(post) });
+  const { data: post } = await supabase.from("posts").select("id, workspace_id, attachments").eq("id", id).maybeSingle();
+  if (!post) return Response.json({ error: "없음" }, { status: 404 });
+  const attachments = post.attachments as Attachment[];
+  const target = attachments.find((a) => a.path === removeAttachment);
+  if (target && target.path.startsWith(postDir(post.workspace_id, post.id))) await deleteFile(target.path);
+  const { data, error } = await supabase
+    .from("posts")
+    .update({ attachments: attachments.filter((a) => a.path !== removeAttachment) })
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) return Response.json({ error: error.message }, { status: 400 });
+  return Response.json({ post: data });
 }
 
 export async function DELETE(_req: Request, ctx: RouteContext<"/api/posts/[id]">) {
-  await deletePrefix(postDir((await ctx.params).id));
+  const { id } = await ctx.params;
+  const { supabase, user } = await requireUser();
+  if (!user) return Response.json({ error: "로그인이 필요해요" }, { status: 401 });
+  const { data: post } = await supabase.from("posts").select("id, workspace_id").eq("id", id).maybeSingle();
+  if (!post) return Response.json({ error: "없음" }, { status: 404 });
+  await deletePrefix(postDir(post.workspace_id, post.id));
+  const { error } = await supabase.from("posts").delete().eq("id", id);
+  if (error) return Response.json({ error: error.message }, { status: 400 });
   return Response.json({ ok: true });
 }

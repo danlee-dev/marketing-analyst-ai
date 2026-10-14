@@ -2,41 +2,49 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* 중립 잉크 톤. 남색·그라데이션·반투명 없이 면 대비로만 위계를 만든다 */
+/* 중립 잉크 톤. 남색·그라데이션·반투명 없이 면 대비로만 위계를 만든다. 규칙은 DESIGN.md */
 :root {
-  --bg: #f7f7f6;
+  --bg: #f6f6f4;
   --surface: #ffffff;
-  --surface-2: #efefed;
-  --surface-3: #e4e4e1;
+  --surface-2: #eeeeeb;
+  --surface-3: #e2e2de;
   --ink: #161616;
-  --ink-2: #4a4a48;
-  --mute: #8a8a86;
-  --line: #e6e6e3;
+  --ink-2: #4a4a47;
+  --mute: #7a7a75; /* surface 위 4.6:1 */
   --on-ink: #ffffff;
-  --song: #b4540a;
-  --music: #6b7280;
-  --danger: #d0302f;
+  --song: #a14a06;
+  --music: #5f6670;
+  --danger: #c62a28;
   --ring: #161616;
+  --logo-back: #5c5c59;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.14);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.14);
+
+  --r-xl: 28px; /* 시트·큰 카드 */
+  --r-lg: 20px; /* 카드 썸네일·입력 묶음 */
+  --r-md: 14px; /* 버튼·입력 */
+  --r-sm: 8px; /* 작은 칩·안쪽 최소값 */
+
+  --ease-out: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-std: cubic-bezier(0.2, 0, 0, 1);
 }
 
 .dark {
-  --bg: #0b0b0b;
-  --surface: #151515;
-  --surface-2: #1e1e1e;
-  --surface-3: #2a2a2a;
-  --ink: #f2f2f0;
-  --ink-2: #b4b4b0;
-  --mute: #7c7c78;
-  --line: #262626;
-  --on-ink: #0b0b0b;
+  --bg: #0c0c0c;
+  --surface: #161616;
+  --surface-2: #1f1f1f;
+  --surface-3: #2b2b2b;
+  --ink: #f2f2ef;
+  --ink-2: #b6b6b1;
+  --mute: #8b8b86; /* surface 위 5.0:1 */
+  --on-ink: #0c0c0c;
   --song: #f0a050;
-  --music: #9ca3af;
-  --danger: #ff5f5c;
-  --ring: #f2f2f0;
+  --music: #a3aab4;
+  --danger: #ff6b68;
+  --ring: #f2f2ef;
+  --logo-back: #a3a39e;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
-  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.6);
 }
 
 @theme inline {
@@ -47,13 +55,17 @@
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-mute: var(--mute);
-  --color-line: var(--line);
   --color-on-ink: var(--on-ink);
   --color-song: var(--song);
   --color-music: var(--music);
   --color-danger: var(--danger);
   --font-sans: var(--font-pretendard), system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --radius-xl: var(--r-xl);
+  --radius-lg: var(--r-lg);
+  --radius-md: var(--r-md);
+  --radius-sm: var(--r-sm);
+  --ease-out: var(--ease-out);
 }
 
 html {
@@ -67,14 +79,18 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  letter-spacing: -0.025em;
+  line-height: 1.6;
+  letter-spacing: 0;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
   -webkit-font-smoothing: antialiased;
-  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 h1,
-h2 {
-  letter-spacing: -0.04em;
+h2,
+h3 {
+  line-height: 1.25;
+  letter-spacing: -0.02em;
 }
 
 ::selection {
@@ -85,7 +101,34 @@ h2 {
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: 8px;
+}
+
+/* Apple 식 연속 곡선 모서리. 지원 브라우저에서만, 같은 값이면 덜 둥글어 보여 1.4배 */
+@supports (corner-shape: squircle) {
+  .rounded-xl,
+  .rounded-lg,
+  .rounded-md,
+  .rounded-sm,
+  .rounded-2xl,
+  .rounded-3xl {
+    corner-shape: squircle;
+  }
+  .rounded-xl {
+    border-radius: calc(var(--r-xl) * 1.4);
+  }
+  .rounded-lg {
+    border-radius: calc(var(--r-lg) * 1.4);
+  }
+  .rounded-md {
+    border-radius: calc(var(--r-md) * 1.4);
+  }
+}
+
+.press {
+  transition: transform 0.15s var(--ease-std), background-color 0.15s, color 0.15s, opacity 0.15s;
+}
+.press:active {
+  transform: scale(0.97);
 }
 
 .no-scrollbar {
@@ -93,4 +136,13 @@ h2 {
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
