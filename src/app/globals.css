@@ -1,26 +1,96 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* 중립 잉크 톤. 남색·그라데이션·반투명 없이 면 대비로만 위계를 만든다 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f7f7f6;
+  --surface: #ffffff;
+  --surface-2: #efefed;
+  --surface-3: #e4e4e1;
+  --ink: #161616;
+  --ink-2: #4a4a48;
+  --mute: #8a8a86;
+  --line: #e6e6e3;
+  --on-ink: #ffffff;
+  --song: #b4540a;
+  --music: #6b7280;
+  --danger: #d0302f;
+  --ring: #161616;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.14);
+}
+
+.dark {
+  --bg: #0b0b0b;
+  --surface: #151515;
+  --surface-2: #1e1e1e;
+  --surface-3: #2a2a2a;
+  --ink: #f2f2f0;
+  --ink-2: #b4b4b0;
+  --mute: #7c7c78;
+  --line: #262626;
+  --on-ink: #0b0b0b;
+  --song: #f0a050;
+  --music: #9ca3af;
+  --danger: #ff5f5c;
+  --ring: #f2f2f0;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 12px 40px rgb(0 0 0 / 0.6);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-mute: var(--mute);
+  --color-line: var(--line);
+  --color-on-ink: var(--on-ink);
+  --color-song: var(--song);
+  --color-music: var(--music);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-pretendard), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  letter-spacing: -0.025em;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+h1,
+h2 {
+  letter-spacing: -0.04em;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--on-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
