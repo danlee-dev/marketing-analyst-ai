@@ -86,7 +86,7 @@ export function ClaudeConnect() {
   }
 
   const token = fresh ?? "<토큰>";
-  const codeCmd = `claude mcp add --transport http reference-box ${url} --header "Authorization: Bearer ${token}"`;
+  const codeCmd = `claude mcp add --scope user --transport http reference-box ${url} --header "Authorization: Bearer ${token}"`;
   const desktop = JSON.stringify(
     { mcpServers: { "reference-box": { command: "npx", args: ["-y", "mcp-remote", url, "--header", "Authorization:${AUTH}"], env: { AUTH: `Bearer ${token}` } } } },
     null,
