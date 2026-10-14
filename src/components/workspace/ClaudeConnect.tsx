@@ -99,7 +99,7 @@ export function ClaudeConnect() {
       <img src="/claude-mark.svg" alt="" width={40} height={40} />
       <h2 className="mt-4 text-[22px] font-bold">내 Claude 연결</h2>
       <p className="mt-2 pr-6 text-[15px] text-ink-2">
-        Claude Code나 Claude Desktop이 레퍼런스를 직접 읽고 분석해 메모로 남겨요. 분석은 내 Claude 안에서 돌아서 따로 API 비용이 들지 않아요.
+        Claude Code나 Claude Desktop이 레퍼런스를 직접 읽고 분석해 메모로 남겨요. Claude Code는 릴스 원본 영상을 내려받아 장면별로 나눠 보는 것까지 해요. 분석은 내 Claude 안에서 돌아서 따로 API 비용이 들지 않아요.
       </p>
       <button onClick={create} disabled={busy} className="press mt-5 flex h-11 items-center gap-2 rounded-md bg-ink px-5 text-[15px] font-semibold text-on-ink disabled:opacity-40">
         <KeyRound size={16} /> 연결 토큰 만들기
@@ -111,7 +111,7 @@ export function ClaudeConnect() {
             <p className="mt-4 text-[14px] font-semibold text-ink">이 토큰은 지금만 보여요. 아래 명령을 바로 복사해 두세요.</p>
             <Snippet label="Claude Code (터미널)" value={codeCmd} copied={copied === "code"} onCopy={() => copy("code", codeCmd)} />
             <Snippet label="Claude Desktop (claude_desktop_config.json)" value={desktop} copied={copied === "desk"} onCopy={() => copy("desk", desktop)} />
-            <p className="mt-2 text-[13px] text-mute">연결한 뒤 Claude에게 &ldquo;레퍼런스 보관함에서 릴스 훅 폴더 분석해 줘&rdquo;처럼 말하면 돼요.</p>
+            <p className="mt-2 text-[13px] text-mute">연결한 뒤 Claude에게 &ldquo;레퍼런스 보관함 릴스 훅 폴더의 영상들 장면까지 분석해서 메모로 남겨 줘&rdquo;처럼 말하면 돼요.</p>
           </motion.div>
         )}
       </AnimatePresence>
