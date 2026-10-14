@@ -22,11 +22,13 @@ const STAGE_TEXT: Record<Job["stage"], string> = {
 
 export function IngestBox({
   jobs,
+  placeholder,
   onSubmit,
   onRetry,
   onDismiss,
 }: {
   jobs: Job[];
+  placeholder?: string;
   onSubmit: (codes: string[]) => void;
   onRetry: (job: Job) => void;
   onDismiss: (job: Job) => void;
@@ -44,7 +46,7 @@ export function IngestBox({
 
   return (
     <div>
-      <div className="flex items-end gap-2 rounded-[22px] bg-surface p-2 shadow-[var(--shadow)] transition-shadow focus-within:shadow-[var(--shadow-lg)]">
+      <div className="flex items-end gap-2 rounded-lg bg-surface-2 p-1.5 transition-shadow focus-within:bg-surface focus-within:shadow-[var(--shadow-lg)] focus-within:ring-1 focus-within:ring-surface-3">
         <textarea
           ref={ref}
           rows={1}
@@ -60,15 +62,14 @@ export function IngestBox({
               submit();
             }
           }}
-          placeholder="인스타 게시물·릴스 링크를 붙여넣으세요. 여러 개도 한 번에 돼요."
-          className="no-scrollbar max-h-[200px] min-h-11 flex-1 resize-none bg-transparent px-3 py-2.5 text-[15px] leading-6 outline-none placeholder:text-mute"
+          placeholder={placeholder ?? "인스타 게시물·릴스 링크를 붙여넣으세요. 여러 개도 한 번에 돼요."}
+          className="no-scrollbar max-h-[200px] min-h-12 flex-1 resize-none bg-transparent px-3.5 py-3 text-[15px] leading-6 outline-none placeholder:text-mute"
         />
         <motion.button
           type="button"
           onClick={submit}
           disabled={!codes.length}
-          whileTap={{ scale: 0.94 }}
-          className="flex h-11 shrink-0 items-center gap-1.5 rounded-2xl bg-ink px-4 text-[14px] font-semibold text-on-ink transition-opacity disabled:opacity-25"
+          className="press flex h-12 shrink-0 items-center gap-1.5 rounded-md bg-ink px-5 text-[14px] font-semibold text-on-ink transition-opacity disabled:opacity-25"
         >
           <AnimatePresence mode="popLayout" initial={false}>
             {codes.length > 1 && (
@@ -99,7 +100,7 @@ export function IngestBox({
               exit={{ opacity: 0, height: 0, transition: { duration: 0.2 } }}
               className="overflow-hidden"
             >
-              <div className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-2.5">
+              <div className="flex items-center gap-3 rounded-md bg-surface-2 px-4 py-2.5">
                 <StageIcon stage={job.stage} />
                 <span className="font-mono text-[13px] text-ink-2">{job.shortcode}</span>
                 <span className={`min-w-0 flex-1 truncate text-[14px] ${job.stage === "error" ? "text-danger" : "text-ink-2"}`}>

@@ -1,21 +1,23 @@
 import { get } from "@vercel/blob";
 import type { NextRequest } from "next/server";
+import { workspaceOfPath } from "@/lib/blob";
+import { isMember } from "@/lib/supabase/server";
 
-// 비공개 Blob 을 로그인한 사용자에게만 내려준다. Range 를 넘겨 영상 탐색도 된다.
+// 비공개 Blob 을 그 워크스페이스 멤버에게만 내려준다. Range 를 넘겨 영상 탐색도 된다.
 export async function GET(request: NextRequest) {
   const path = request.nextUrl.searchParams.get("path");
-  if (!path || !path.startsWith("posts/") || path.includes("..")) {
-    return new Response("bad path", { status: 400 });
-  }
+  const ws = path && !path.includes("..") ? workspaceOfPath(path) : null;
+  if (!path || !ws) return new Response("bad path", { status: 400 });
+  if (!(await isMember(ws)).ok) return new Response("forbidden", { status: 403 });
+
   const range = request.headers.get("range");
   const res = await get(path, { access: "private", headers: range ? { range } : undefined });
   const status = (res?.statusCode ?? 404) as number;
-  if (!res || !res.stream || (status !== 200 && status !== 206)) {
-    return new Response("not found", { status: 404 });
-  }
+  if (!res || !res.stream || (status !== 200 && status !== 206)) return new Response("not found", { status: 404 });
+
   const headers = new Headers({
     "Content-Type": res.blob.contentType ?? "application/octet-stream",
-    "Cache-Control": "private, max-age=3600",
+    "Cache-Control": "private, max-age=86400, immutable",
     "Accept-Ranges": "bytes",
     "X-Content-Type-Options": "nosniff",
   });

@@ -50,7 +50,7 @@ export function safeName(s: string, max = 60): string {
 }
 
 export function folderName(post: Post): string {
-  const date = kstDate(post.takenAt);
+  const date = kstDate(post.taken_at);
   return `${date}_${post.account.username}_${safeName(post.title, 50)}`;
 }
 
