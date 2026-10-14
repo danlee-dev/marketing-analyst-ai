@@ -1,7 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC = [/^\/login/, /^\/auth\//, /^\/api\/auth\//, /^\/invite\//];
+const PUBLIC = [/^\/login/, /^\/auth\//, /^\/api\/auth\//, /^\/invite\//, /^\/api\/mcp/, /^\/\.well-known\//];
 
 // Supabase 세션을 갱신하고, 로그인 안 한 사용자는 로그인 화면으로
 export async function proxy(request: NextRequest) {

@@ -3,11 +3,12 @@
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUp, Check, Loader2, RotateCw, X } from "lucide-react";
 import { useRef, useState } from "react";
-import { extractShortcodes } from "@/lib/naming";
+import { extractLinks, type Detected } from "@/lib/sources/detect";
 
 export type Job = {
   key: string;
-  shortcode: string;
+  url: string;
+  label: string;
   stage: "queued" | "fetching" | "transcribing" | "done" | "error";
   detail?: string;
 };
@@ -29,13 +30,13 @@ export function IngestBox({
 }: {
   jobs: Job[];
   placeholder?: string;
-  onSubmit: (codes: string[]) => void;
+  onSubmit: (links: Detected[]) => void;
   onRetry: (job: Job) => void;
   onDismiss: (job: Job) => void;
 }) {
   const [text, setText] = useState("");
   const ref = useRef<HTMLTextAreaElement>(null);
-  const codes = extractShortcodes(text);
+  const codes = extractLinks(text);
 
   function submit() {
     if (!codes.length) return;
@@ -62,7 +63,7 @@ export function IngestBox({
               submit();
             }
           }}
-          placeholder={placeholder ?? "인스타 링크를 붙여넣으세요"}
+          placeholder={placeholder ?? "링크를 붙여넣으세요"}
           className="no-scrollbar max-h-[200px] min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3.5 py-3 text-[15px] leading-6 outline-none placeholder:text-mute"
         />
         <motion.button
@@ -102,7 +103,7 @@ export function IngestBox({
             >
               <div className="flex items-center gap-3 rounded-md bg-surface-2 px-4 py-2.5">
                 <StageIcon stage={job.stage} />
-                <span className="font-mono text-[13px] text-ink-2">{job.shortcode}</span>
+                <span className="max-w-[40%] truncate font-mono text-[13px] text-ink-2">{job.label}</span>
                 <span className={`min-w-0 flex-1 truncate text-[14px] ${job.stage === "error" ? "text-danger" : "text-ink-2"}`}>
                   {job.detail ?? STAGE_TEXT[job.stage]}
                 </span>

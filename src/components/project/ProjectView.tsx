@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, Download, Folder as FolderIcon, FolderPlus, Search, X } from "lucide-react";
+import { AlignLeft, ChevronRight, Download, Folder as FolderIcon, FolderPlus, Globe, Image as ImageIcon, Play, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,11 +10,13 @@ import { db, fileUrl, server } from "@/lib/client/api";
 import { classifyAudio } from "@/lib/client/audio";
 import { downloadZip } from "@/lib/client/zip";
 import { safeName } from "@/lib/naming";
-import type { Attachment, Post } from "@/lib/types";
+import { detect, jobLabel, type Detected } from "@/lib/sources/detect";
+import { FORMAT_GROUP, type Attachment, type Post } from "@/lib/types";
 import { ask, EASE, toast, toastError } from "../ui/overlay";
 import { newFolder, zipScope } from "../workspace/actions";
 import { childrenOf, descendantIds, folderTrail, useWorkspace } from "../workspace/context";
 import { movedEvent, POST_DRAG } from "../workspace/Sidebar";
+import { AddDialog } from "./AddDialog";
 import { IngestBox, type Job } from "./IngestBox";
 import { PostCard } from "./PostCard";
 import { PostSheet } from "./PostSheet";
@@ -39,6 +41,8 @@ function ProjectBody() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openId, setOpenId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [group, setGroup] = useState<"all" | "video" | "image" | "text" | "page">("all");
+  const [adding, setAdding] = useState(false);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState<{ id: string; pct: number } | null>(null);
   const [zipping, setZipping] = useState<{ done: number; total: number } | null>(null);
@@ -124,16 +128,16 @@ function ProjectBody() {
       (async () => {
         try {
           updateJob(job.key, { stage: "fetching", detail: undefined });
-          const { post, existed } = await server.ingest(projectId, job.shortcode, job.folderId);
+          const { post, existed } = await server.ingest(projectId, job.url, job.folderId);
           upsert(post);
           w.refreshCounts();
           if (existed) updateJob(job.key, { stage: "done", detail: "이 프로젝트에 이미 있어요" });
           else {
-            if (post.media.some((m) => m.kind === "video")) {
+            if (post.media.some((m) => m.kind === "video") && !post.transcripts.length) {
               updateJob(job.key, { stage: "transcribing" });
               await transcribe(post, (detail) => updateJob(job.key, { detail }));
             }
-            updateJob(job.key, { stage: "done", detail: `@${post.account.username} 저장했어요` });
+            updateJob(job.key, { stage: "done", detail: `${post.source === "web" ? post.site : `@${post.account.username}`} 저장했어요` });
           }
           setTimeout(() => setJobs((js) => js.filter((j) => j.key !== job.key)), 1800);
         } catch (e) {
@@ -147,8 +151,8 @@ function ProjectBody() {
   }, [projectId, transcribe, upsert, w]);
 
   const enqueue = useCallback(
-    (codes: string[]) => {
-      const fresh = codes.map((shortcode) => ({ key: `${shortcode}-${Date.now()}-${Math.random()}`, shortcode, stage: "queued" as const }));
+    (links: Detected[]) => {
+      const fresh = links.map((d) => ({ key: `${d.url}-${Date.now()}-${Math.random()}`, url: d.url, label: jobLabel(d), stage: "queued" as const }));
       setJobs((js) => [...js, ...fresh]);
       queue.current.push(...fresh.map((j) => ({ ...j, folderId })));
       pump();
@@ -163,9 +167,21 @@ function ProjectBody() {
     return posts.filter(
       (p) =>
         (!scope || (p.folder_id && scope.has(p.folder_id))) &&
-        (!q || [p.title, p.account.username, p.account.fullName ?? "", p.caption, p.note].some((s) => s.toLowerCase().includes(q))),
+        (group === "all" || FORMAT_GROUP[p.format] === group) &&
+        (!q || [p.title, p.account.username, p.account.fullName ?? "", p.caption, p.note, p.site ?? "", p.body.slice(0, 2000)].some((s) => s.toLowerCase().includes(q))),
     );
-  }, [posts, scope, query]);
+  }, [posts, scope, query, group]);
+
+  // 형식 필터 개수는 폴더 범위 기준
+  const groupCounts = useMemo(() => {
+    const c = { all: 0, video: 0, image: 0, text: 0, page: 0 };
+    for (const p of posts ?? []) {
+      if (scope && !(p.folder_id && scope.has(p.folder_id))) continue;
+      c.all++;
+      c[FORMAT_GROUP[p.format]]++;
+    }
+    return c;
+  }, [posts, scope]);
 
   function toggle(id: string, shift: boolean) {
     setSelected((s) => {
@@ -318,14 +334,18 @@ function ProjectBody() {
       <div className="mt-8 max-w-2xl">
         <IngestBox
           jobs={jobs}
-          placeholder="인스타 링크를 붙여넣으세요"
+          placeholder="인스타·YouTube·X·TikTok·웹 링크를 붙여넣으세요"
           onSubmit={enqueue}
           onRetry={(job) => {
             setJobs((js) => js.filter((j) => j.key !== job.key));
-            enqueue([job.shortcode]);
+            const d = detect(job.url);
+            if (d) enqueue([d]);
           }}
           onDismiss={(job) => setJobs((js) => js.filter((j) => j.key !== job.key))}
         />
+        <button onClick={() => setAdding(true)} className="press mt-3 flex h-9 items-center gap-1.5 rounded-md px-3 text-[14px] text-ink-2 hover:bg-surface-2 hover:text-ink">
+          <Plus size={15} /> 캡처·파일·메모 직접 추가
+        </button>
       </div>
 
       <div className="mt-10 flex flex-wrap gap-2">
@@ -339,7 +359,7 @@ function ProjectBody() {
 
       <div className="mt-10 flex flex-wrap items-center gap-3">
         <h2 className="text-[20px] font-bold">
-          게시물 <span className="tabular-nums text-mute">{posts ? visible.length : ""}</span>
+          레퍼런스 <span className="tabular-nums text-mute">{posts ? visible.length : ""}</span>
         </h2>
         <div className="ml-auto flex items-center gap-2">
           <label className="flex h-10 w-44 items-center gap-2 rounded-md bg-surface-2 px-3 text-ink-2 transition-[width] duration-300 focus-within:w-60 sm:w-56 sm:focus-within:w-72">
@@ -365,6 +385,36 @@ function ProjectBody() {
             </button>
           )}
         </div>
+      </div>
+
+      <div className="no-scrollbar -mx-1 mt-4 flex gap-1.5 overflow-x-auto px-1">
+        {(
+          [
+            ["all", "전체", null],
+            ["video", "영상", <Play key="v" size={13} />],
+            ["image", "이미지", <ImageIcon key="i" size={13} />],
+            ["text", "글", <AlignLeft key="t" size={13} />],
+            ["page", "웹페이지", <Globe key="g" size={13} />],
+          ] as const
+        ).map(([key, label, icon]) =>
+          key !== "all" && !groupCounts[key] ? null : (
+            <button
+              key={key}
+              onClick={() => setGroup(key)}
+              className={`press relative flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[14px] font-medium transition-colors ${
+                group === key ? "text-on-ink" : "text-ink-2 hover:text-ink"
+              }`}
+            >
+              {group === key && <motion.span layoutId="format-pill" className="absolute inset-0 rounded-full bg-ink" transition={{ duration: 0.3, ease: EASE }} />}
+              {group !== key && <span className="absolute inset-0 rounded-full bg-surface-2" />}
+              <span className="relative flex items-center gap-1.5">
+                {icon}
+                {label}
+                <span className={`tabular-nums ${group === key ? "opacity-70" : "text-mute"}`}>{groupCounts[key]}</span>
+              </span>
+            </button>
+          ),
+        )}
       </div>
 
       {posts === null ? (
@@ -414,6 +464,8 @@ function ProjectBody() {
         onDelete={() => removePosts([...selected])}
         onMove={(to) => move([...selected], to)}
       />
+
+      <AddDialog open={adding} onClose={() => setAdding(false)} project={project} folderId={folderId} onCreated={upsert} />
 
       <PostSheet
         post={open}
