@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import { AnimatePresence, motion } from "motion/react";
-import { AlignLeft, ChevronRight, Download, Folder as FolderIcon, FolderPlus, Globe, Image as ImageIcon, Play, Plus, Search, X } from "lucide-react";
+import { AlignLeft, ChevronRight, Download, Folder as FolderIcon, FolderPlus, Globe, Image as ImageIcon, Pencil, Play, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -319,9 +319,23 @@ function ProjectBody() {
         )}
       </nav>
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <motion.h1 key={`title-${current?.id ?? project.id}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="min-w-0 text-[28px] font-bold sm:text-[36px]">
-        {current?.name ?? project.name}
-      </motion.h1>
+        <EditableTitle
+          key={`title-${current?.id ?? project.id}`}
+          value={current?.name ?? project.name}
+          onSave={async (name) => {
+            try {
+              if (current) {
+                const up = await db.renameFolder(current.id, name);
+                w.setFolders((l) => l.map((f) => (f.id === up.id ? up : f)));
+              } else {
+                const up = await db.updateProject(project.id, { name });
+                w.setProjects((l) => l.map((p) => (p.id === up.id ? up : p)));
+              }
+            } catch (e) {
+              toastError(e);
+            }
+          }}
+        />
         <button
           onClick={() => zipScope(project, folderId, w.folders)}
           className="press flex h-10 items-center gap-2 rounded-md bg-surface-2 px-4 text-[14px] font-semibold text-ink-2 hover:bg-surface-3 hover:text-ink"
@@ -559,5 +573,57 @@ function FolderTile({ href, name, count, index, onDropPosts }: { href: string; n
         <span className={`tabular-nums ${over ? "" : "text-mute"}`}>{count}</span>
       </Link>
     </motion.div>
+  );
+}
+
+// 큰 제목을 눌러 바로 이름 바꾸기 (Enter 저장, Esc 취소)
+function EditableTitle({ value, onSave }: { value: string; onSave: (v: string) => void | Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const cls = "min-w-0 text-[28px] font-bold leading-tight tracking-[-0.02em] sm:text-[36px]";
+
+  const commit = async () => {
+    const next = draft.trim();
+    setEditing(false);
+    if (next && next !== value) await onSave(next.slice(0, 60));
+    else setDraft(value);
+  };
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        maxLength={60}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+          }
+        }}
+        aria-label="이름"
+        className={`${cls} -mx-2 w-full max-w-2xl rounded-md bg-surface-2 px-2 outline-none ring-1 ring-ink/25`}
+      />
+    );
+  }
+  return (
+    <motion.h1 initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className={cls}>
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
+        title="눌러서 이름 바꾸기"
+        className="group/title -mx-2 flex max-w-full items-center gap-2 rounded-md px-2 text-left transition-colors hover:bg-surface-2"
+      >
+        <span className="truncate">{value}</span>
+        <Pencil size={18} className="shrink-0 text-mute opacity-0 transition-opacity group-hover/title:opacity-100" />
+      </button>
+    </motion.h1>
   );
 }
