@@ -1,7 +1,8 @@
 "use client";
 
+import { DotField } from "@/components/ui/DotField";
 import { motion } from "motion/react";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/client/api";
@@ -54,22 +55,53 @@ export default function Home() {
   }
 
   return (
-    <main className="grid min-h-dvh place-items-center px-4">
-      <motion.form onSubmit={create} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="w-full max-w-[420px]">
-        <LogoMark size={44} />
-        <h1 className="mt-6 text-[28px] font-bold">워크스페이스를 만들어요</h1>
-        <p className="mt-2 text-[15px] text-ink-2">진행하는 사업 아이템 이름으로 지으면 좋아요. 팀원은 나중에 초대할 수 있어요.</p>
-        <div className="mt-8 flex items-center gap-2 rounded-lg bg-surface p-1.5 shadow-[var(--shadow)]">
-          <input
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="예: 플러디, 신규 브랜드"
-            maxLength={60}
-            className="h-12 min-w-0 flex-1 bg-transparent px-3 text-[15px] outline-none placeholder:text-mute"
-          />
-          <button type="submit" disabled={!name.trim() || busy} aria-label="만들기" className="press grid size-12 shrink-0 place-items-center rounded-md bg-ink text-on-ink disabled:opacity-30">
-            {busy ? <Loader2 size={18} className="animate-spin" /> : <ArrowRight size={18} />}
+    <main className="relative grid min-h-dvh place-items-center px-4">
+      <DotField />
+      <motion.form
+        onSubmit={create}
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: EASE }}
+        className="relative w-full max-w-[440px] rounded-xl bg-surface p-7 shadow-[var(--shadow-lg)]"
+      >
+        <div className="flex items-center gap-3.5">
+          <motion.span
+            key={name.trim().slice(0, 1) || "·"}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.25, ease: EASE }}
+            className="grid size-11 shrink-0 place-items-center rounded-md bg-ink text-[18px] font-bold text-on-ink"
+          >
+            {name.trim().slice(0, 1) || <LogoMark size={44} />}
+          </motion.span>
+          <div>
+            <h1 className="text-[20px] font-bold">새 워크스페이스</h1>
+            <p className="text-[14px] text-mute">아이템 하나의 레퍼런스와 팀이 모이는 곳이에요.</p>
+          </div>
+        </div>
+
+        <label htmlFor="ws-name" className="mt-7 block text-[14px] font-semibold text-ink-2">
+          워크스페이스 이름
+        </label>
+        <input
+          id="ws-name"
+          autoFocus
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="예: 플러디, 신규 브랜드"
+          maxLength={60}
+          className="mt-2 h-12 w-full rounded-md bg-surface-2 px-4 text-[15px] outline-none transition-shadow placeholder:text-mute focus:ring-1 focus:ring-ink/25"
+        />
+        <p className="mt-2 text-[13px] text-mute">팀원은 만든 뒤에 초대 링크로 부를 수 있어요.</p>
+
+        <div className="mt-7 flex justify-end">
+          <button
+            type="submit"
+            disabled={!name.trim() || busy}
+            className="press flex h-11 items-center gap-2 rounded-md bg-ink px-5 text-[15px] font-semibold text-on-ink disabled:opacity-30"
+          >
+            {busy ? <Loader2 size={17} className="animate-spin" /> : null}
+            {busy ? "만드는 중" : "워크스페이스 만들기"}
           </button>
         </div>
       </motion.form>

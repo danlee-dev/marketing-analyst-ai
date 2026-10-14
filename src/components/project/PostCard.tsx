@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { Check, Copy, Folder as FolderIcon, Loader2, Paperclip, Play } from "lucide-react";
 import { useState } from "react";
 import { fileUrl } from "@/lib/client/api";
-import type { Post } from "@/lib/types";
+import { isNoAudio, type Post } from "@/lib/types";
 import { EASE } from "../ui/overlay";
 import { POST_DRAG } from "../workspace/Sidebar";
 
@@ -36,7 +36,7 @@ export function PostCard({
   const [over, setOver] = useState(false);
   const [dragging, setDragging] = useState(false);
   const videos = post.media.filter((m) => m.kind === "video").length;
-  const done = post.transcripts.filter((t) => t.status === "done").length;
+  const done = post.transcripts.filter((t) => t.status === "done" || isNoAudio(t)).length;
 
   return (
     <motion.li

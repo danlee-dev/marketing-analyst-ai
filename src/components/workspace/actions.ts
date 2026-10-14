@@ -2,7 +2,8 @@
 
 import { db } from "@/lib/client/api";
 import type { Folder, Project } from "@/lib/types";
-import { ask, promptText, toastError } from "../ui/overlay";
+import { downloadZip } from "@/lib/client/zip";
+import { ask, promptText, setProgress, toast, toastError } from "../ui/overlay";
 import { descendantIds } from "./context";
 
 // 사이드바·홈·프로젝트 화면이 같이 쓰는 생성/이름변경/삭제 흐름
@@ -83,5 +84,34 @@ export async function removeFolder(f: Folder, folders: Folder[]): Promise<Set<st
   } catch (e) {
     toastError(e);
     return null;
+  }
+}
+
+let zipping = false;
+
+// 프로젝트 전체 또는 폴더 하나(하위 폴더 포함)를 구조 그대로 zip 으로
+export async function zipScope(project: Project, folderId: string | null, folders: Folder[]) {
+  if (zipping) return toast("이미 압축 중이에요. 끝나면 다시 눌러 주세요");
+  zipping = true;
+  const folder = folderId ? folders.find((f) => f.id === folderId) : null;
+  const label = folder ? folder.name : project.name;
+  try {
+    setProgress({ label: `${label} 모으는 중`, done: 0, total: 1 });
+    const all = await db.posts(project.id);
+    const scope = folderId ? descendantIds(folders, folderId) : null;
+    const posts = scope ? all.filter((p) => p.folder_id && scope.has(p.folder_id)) : all;
+    if (!posts.length) {
+      toast(`'${label}'에 게시물이 없어요`);
+      return;
+    }
+    await downloadZip(posts, { projectName: project.name, folders, baseFolderId: folderId, rootName: label }, (done, total) =>
+      setProgress({ label: `${label} 압축 중`, done, total }),
+    );
+    toast(`'${label}' ${posts.length}개를 zip 으로 묶었어요`);
+  } catch (e) {
+    toastError(e);
+  } finally {
+    zipping = false;
+    setProgress(null);
   }
 }

@@ -24,7 +24,10 @@ export async function POST(request: Request, ctx: RouteContext<"/api/posts/[id]"
     const lines = await transcribeFile(blob, media.path.split("/").pop() ?? "video.mp4");
     transcript = { mediaIndex, status: "done", lines: labelLines(lines, audio ?? null), audio: audioRuns(audio ?? null) };
   } catch (e) {
-    transcript = { mediaIndex, status: "error", lines: [], error: e instanceof Error ? e.message : "전사 실패" };
+    const message = e instanceof Error ? e.message : "전사 실패";
+    transcript = /no audio stream/i.test(message)
+      ? { mediaIndex, status: "done", lines: [], noAudio: true }
+      : { mediaIndex, status: "error", lines: [], error: message };
   }
 
   // 전사 도중 다른 영상 전사가 끝났을 수 있으니 다시 읽고 합친다
