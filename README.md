@@ -44,5 +44,7 @@ pnpm dev
 claude mcp add --transport http reference-box https://<도메인>/api/mcp --header "Authorization: Bearer <토큰>"
 ```
 
-도구: `list_workspaces`, `list_projects`, `list_references`, `get_reference`(본문·전사·이미지), `search_references`, `save_note`, `add_reference`.
+도구: `list_workspaces`, `list_projects`, `list_references`, `get_reference`(본문·전사·이미지), `get_media_links`(원본 영상·사진 임시 링크), `search_references`, `save_note`, `add_reference`.
+
+영상 화면 분석: Claude Code 가 `get_media_links` 로 받은 서명 링크(`/api/dl`, 기본 1시간, HMAC)로 영상을 내려받아 로컬 ffmpeg 로 프레임을 나눠 본다. 서버는 파일만 내준다.
 분석은 사용자 쪽 Claude 가 하므로 서버에서 Claude API 를 호출하지 않는다. 토큰은 sha256 만 저장(`api_tokens`), 모든 도구는 워크스페이스 멤버십으로 범위를 제한한다.
