@@ -2,7 +2,7 @@
 
 import { upload } from "@vercel/blob/client";
 import { AnimatePresence, motion } from "motion/react";
-import { ChevronRight, Folder as FolderIcon, FolderPlus, Search, X } from "lucide-react";
+import { ChevronRight, Download, Folder as FolderIcon, FolderPlus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -12,7 +12,7 @@ import { downloadZip } from "@/lib/client/zip";
 import { safeName } from "@/lib/naming";
 import type { Attachment, Post } from "@/lib/types";
 import { ask, EASE, toast, toastError } from "../ui/overlay";
-import { newFolder } from "../workspace/actions";
+import { newFolder, zipScope } from "../workspace/actions";
 import { childrenOf, descendantIds, folderTrail, useWorkspace } from "../workspace/context";
 import { movedEvent, POST_DRAG } from "../workspace/Sidebar";
 import { IngestBox, type Job } from "./IngestBox";
@@ -302,9 +302,17 @@ function ProjectBody() {
           </>
         )}
       </nav>
-      <motion.h1 key={`title-${current?.id ?? project.id}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="mt-1 text-[28px] font-bold sm:text-[36px]">
+      <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-3">
+        <motion.h1 key={`title-${current?.id ?? project.id}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="min-w-0 text-[28px] font-bold sm:text-[36px]">
         {current?.name ?? project.name}
       </motion.h1>
+        <button
+          onClick={() => zipScope(project, folderId, w.folders)}
+          className="press flex h-10 items-center gap-2 rounded-md bg-surface-2 px-4 text-[14px] font-semibold text-ink-2 hover:bg-surface-3 hover:text-ink"
+        >
+          <Download size={15} /> {current ? "폴더 zip 받기" : "전체 zip 받기"}
+        </button>
+      </div>
       {!current && <Description key={`desc-${project.id}`} />}
 
       <div className="mt-8 max-w-2xl">

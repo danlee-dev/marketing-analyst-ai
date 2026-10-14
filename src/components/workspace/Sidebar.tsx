@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   Check,
   ChevronRight,
+  Download,
   ChevronsUpDown,
   Folder as FolderIcon,
   FolderPlus,
@@ -26,7 +27,7 @@ import { db } from "@/lib/client/api";
 import { supabase } from "@/lib/supabase/browser";
 import type { Folder, Project } from "@/lib/types";
 import { MenuItem, Popover, promptText, toast, toastError } from "../ui/overlay";
-import { newFolder, newProject, removeFolder, removeProject, renameFolder, renameProject } from "./actions";
+import { newFolder, newProject, removeFolder, removeProject, renameFolder, renameProject, zipScope } from "./actions";
 import { childrenOf, useWorkspace } from "./context";
 
 export const POST_DRAG = "application/x-post-ids";
@@ -115,6 +116,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 project
                 menu={(close) => (
                   <>
+                    <MenuItem icon={<Download size={15} />} onClick={() => (close(), zipScope(p, null, w.folders))}>
+                      프로젝트 전체 zip 받기
+                    </MenuItem>
                     <MenuItem icon={<FolderPlus size={15} />} onClick={() => (close(), addFolder(p, null))}>
                       폴더 추가
                     </MenuItem>
@@ -217,6 +221,9 @@ function FolderTree({
             onAdd={() => addFolder(project, f.id)}
             menu={(close) => (
               <>
+                <MenuItem icon={<Download size={15} />} onClick={() => (close(), zipScope(project, f.id, w.folders))}>
+                  폴더 zip 받기
+                </MenuItem>
                 <MenuItem icon={<FolderPlus size={15} />} onClick={() => (close(), addFolder(project, f.id))}>
                   하위 폴더 추가
                 </MenuItem>

@@ -29,7 +29,12 @@ export type Transcript = {
   // 가사·말이 없는 구간도 남기기 위한 오디오 구간 요약
   audio?: { start: number; end: number; kind: "speech" | "music" | "song" | "silence" }[];
   error?: string;
+  // 영상에 오디오 트랙 자체가 없음 (오류 아님)
+  noAudio?: boolean;
 };
+
+// 예전에 오류로 저장된 "오디오 트랙 없음" 도 같은 것으로 본다
+export const isNoAudio = (t: Transcript) => !!t.noAudio || (t.status === "error" && /no audio stream/i.test(t.error ?? ""));
 
 export type Attachment = {
   name: string;

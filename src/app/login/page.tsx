@@ -1,5 +1,6 @@
 "use client";
 
+import { DotField } from "@/components/ui/DotField";
 import { AnimatePresence, motion, useAnimationControls } from "motion/react";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -57,11 +58,12 @@ export default function LoginPage() {
   }
 
   const input =
-    "h-12 w-full rounded-md bg-surface-2 px-4 text-[15px] outline-none transition-shadow placeholder:text-mute focus:ring-2 focus:ring-ink";
+    "h-12 w-full rounded-md bg-surface-2 px-4 text-[15px] outline-none transition-shadow placeholder:text-mute focus:ring-1 focus:ring-ink/25";
 
   return (
-    <main className="grid min-h-dvh place-items-center px-4 py-12">
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="w-full max-w-[380px]">
+    <main className="relative grid min-h-dvh place-items-center px-4 py-12">
+      <DotField />
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="relative w-full max-w-[380px]">
         <LogoMark size={52} />
         <h1 className="mt-6 text-[28px] font-[800] tracking-[-0.03em]">레퍼런스 보관함</h1>
         <p className="mt-2 text-[15px] text-ink-2">인스타 레퍼런스를 팀과 함께 모으고 분석용으로 내려받아요.</p>

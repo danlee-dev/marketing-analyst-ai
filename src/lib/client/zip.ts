@@ -1,7 +1,7 @@
 import { Zip, ZipDeflate, ZipPassThrough, strToU8 } from "fflate";
 import { fileUrl } from "./api";
 import { folderName, fmtTime, KIND_LABEL, kstDate, safeName } from "@/lib/naming";
-import type { Folder, Post, Transcript } from "@/lib/types";
+import { isNoAudio, type Folder, type Post, type Transcript } from "@/lib/types";
 
 const n = (v: number | null | undefined) => (v == null ? "-" : v.toLocaleString("ko-KR"));
 const kst = (iso: string) =>
@@ -10,6 +10,7 @@ const ext = (path: string) => path.split(".").pop() ?? "bin";
 
 export function transcriptText(post: Post, t: Transcript): string {
   const head = post.media.length > 1 ? `[미디어 ${String(t.mediaIndex).padStart(2, "0")}]\n` : "";
+  if (isNoAudio(t)) return `${head}(소리 없는 영상)\n`;
   if (t.status === "error") return `${head}(전사 실패: ${t.error})\n`;
   const lines = t.lines.map((l) => {
     const kind = l.kind && l.kind !== "unknown" ? ` (${KIND_LABEL[l.kind]})` : "";
@@ -73,12 +74,12 @@ function indexMarkdown(posts: Post[], folders: string[]): string {
   ].join("\n");
 }
 
-// 폴더 id -> "상위/하위" 경로
-function folderPaths(folders: Folder[]) {
+// 폴더 id -> "상위/하위" 경로. base 를 주면 그 폴더 아래 상대 경로만
+function folderPaths(folders: Folder[], base: string | null) {
   const byId = new Map(folders.map((f) => [f.id, f]));
   const path = (id: string, seen = new Set<string>()): string => {
     const f = byId.get(id);
-    if (!f || seen.has(id)) return "";
+    if (!f || id === base || seen.has(id)) return "";
     seen.add(id);
     const parent = f.parent_id ? path(f.parent_id, seen) : "";
     return parent ? `${parent}/${safeName(f.name, 40)}` : safeName(f.name, 40);
@@ -88,7 +89,7 @@ function folderPaths(folders: Folder[]) {
 
 export async function downloadZip(
   posts: Post[],
-  ctx: { projectName: string; folders: Folder[] },
+  ctx: { projectName: string; folders: Folder[]; baseFolderId?: string | null; rootName?: string },
   onProgress: (done: number, total: number) => void,
 ) {
   const chunks: Uint8Array[] = [];
@@ -110,9 +111,11 @@ export async function downloadZip(
     f.push(new Uint8Array(await res.arrayBuffer()), true);
   };
 
-  const single = posts.length === 1;
-  const root = single ? folderName(posts[0]) : `${safeName(ctx.projectName, 40)}_${kstDate(new Date().toISOString())}_${posts.length}개`;
-  const fpath = folderPaths(ctx.folders);
+  const single = posts.length === 1 && !ctx.rootName;
+  const root = single
+    ? folderName(posts[0])
+    : `${safeName(ctx.rootName ?? ctx.projectName, 50)}_${kstDate(new Date().toISOString())}`;
+  const fpath = folderPaths(ctx.folders, ctx.baseFolderId ?? null);
   const used = new Map<string, number>();
   const dirs = posts.map((p) => {
     if (single) return root;

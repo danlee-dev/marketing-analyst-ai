@@ -5,6 +5,7 @@ import { Menu } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { DotField } from "../ui/DotField";
 import { WorkspaceProvider, useWorkspace } from "./context";
 import { SettingsDialog } from "./SettingsDialog";
 import { Sidebar } from "./Sidebar";
@@ -60,15 +61,18 @@ function Frame({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      <main id="main" className="relative min-w-0 flex-1 overflow-y-auto bg-surface lg:my-2 lg:mr-2 lg:rounded-xl lg:shadow-[var(--shadow)]">
+      <div className="relative min-w-0 flex-1 overflow-hidden bg-surface lg:my-2 lg:mr-2 lg:rounded-xl lg:shadow-[var(--shadow)]">
+        <DotField />
+        <main id="main" className="relative h-full overflow-y-auto">
         <div className="sticky top-0 z-20 flex h-14 items-center gap-2 bg-surface px-3 pt-[env(safe-area-inset-top)] lg:hidden">
           <button aria-label="메뉴" onClick={() => setDrawer(true)} className="press grid size-10 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
             <Menu size={20} />
           </button>
           <span className="truncate text-[15px] font-semibold">{w.workspace?.name}</span>
         </div>
-        {children}
-      </main>
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

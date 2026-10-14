@@ -88,7 +88,7 @@ function Body() {
             toastError(e);
           }
         }}
-        className="mt-2 h-12 w-full rounded-md bg-surface-2 px-4 text-[15px] outline-none focus:ring-2 focus:ring-ink disabled:opacity-60"
+        className="mt-2 h-12 w-full rounded-md bg-surface-2 px-4 text-[15px] outline-none focus:ring-1 focus:ring-ink/25 disabled:opacity-60"
       />
 
       <div className="mt-8 flex items-center justify-between gap-3">

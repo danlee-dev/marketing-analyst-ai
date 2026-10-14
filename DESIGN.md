@@ -32,6 +32,15 @@
 - 누르는 요소는 `.press` (scale 0.97)
 - `prefers-reduced-motion` 이면 전부 끔 (CSS + MotionConfig reducedMotion="user")
 
+## 배경
+- 메인 패널·로그인 화면 뒤에 점 격자(`DotField`, 24px 간격, 1px 점, ink 12%). 일부 점만 천천히 밝아졌다 사그라들고 커서 주변이 살짝 밝아짐
+- 콘텐츠는 항상 점 위 (카드·입력은 자기 면 색을 가짐). 동작 줄이기면 정지
+
+## 입력
+- 입력칸: `bg-surface-2` + `rounded-md`, 테두리 없음. 포커스는 `ring-1 ring-ink/25` 만 (굵은 아웃라인 금지)
+- 라벨은 입력 위 14px semibold, 주 버튼은 입력에 붙이지 않고 아래 오른쪽 (scene24 생성 화면 기준)
+- 2px 포커스 아웃라인은 버튼·링크 키보드 포커스에만
+
 ## 피할 것
 - 작은 글씨 섹션 라벨(eyebrow), 장식용 구분선, 반투명 배경 + 색 테두리 조합, 이모지
 

@@ -5,7 +5,7 @@ import { ArrowUpRight, ChevronDown, Download, FileUp, Folder as FolderIcon, Load
 import { useEffect, useRef, useState } from "react";
 import { fileUrl } from "@/lib/client/api";
 import { fmtTime, KIND_LABEL } from "@/lib/naming";
-import type { Post, Project, TranscriptLine } from "@/lib/types";
+import { isNoAudio, type Post, type Project, type TranscriptLine } from "@/lib/types";
 import { EASE, Popover } from "../ui/overlay";
 import { useWorkspace } from "../workspace/context";
 import { MoveMenu } from "./SelectionBar";
@@ -206,7 +206,7 @@ function Body({ post, project, busy, uploading, onClose, onChange, onUpload, onR
             onBlur={() => note !== post.note && onChange({ note })}
             rows={3}
             placeholder="왜 저장했는지, 따라 할 점, 팀에게 남길 말"
-            className="w-full resize-y rounded-md bg-surface-2 px-4 py-3 text-[15px] leading-relaxed outline-none placeholder:text-mute focus:ring-2 focus:ring-ink"
+            className="w-full resize-y rounded-md bg-surface-2 px-4 py-3 text-[15px] leading-relaxed outline-none placeholder:text-mute focus:ring-1 focus:ring-ink/25"
           />
         </Section>
 
@@ -235,8 +235,10 @@ function Body({ post, project, busy, uploading, onClose, onChange, onUpload, onR
               {post.transcripts.map((t) => (
                 <div key={t.mediaIndex}>
                   {post.media.length > 1 && <p className="mb-2 text-[14px] font-semibold text-ink-2">{t.mediaIndex}번째 영상</p>}
-                  {t.status === "error" ? (
-                    <p className="text-[15px] text-danger">{t.error}</p>
+                  {isNoAudio(t) ? (
+                    <p className="text-[15px] text-mute">소리가 없는 영상이에요.</p>
+                  ) : t.status === "error" ? (
+                    <p className="text-[15px] text-danger">전사하지 못했어요. 다시 전사를 눌러 주세요.</p>
                   ) : t.lines.length === 0 ? (
                     <p className="text-[15px] text-mute">
                       말이나 가사가 없어요{t.audio?.some((a) => a.kind === "music" || a.kind === "song") ? " (배경음악만 있음)" : ""}.

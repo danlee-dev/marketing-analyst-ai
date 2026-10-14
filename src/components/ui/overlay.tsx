@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 
 export const EASE = [0.05, 0.7, 0.1, 1] as const;
 
@@ -19,6 +20,7 @@ type Prompt = {
 type Toast = { id: number; text: string; tone?: "error" };
 
 let dialog: Ask | Prompt | null = null;
+let progress: { label: string; done: number; total: number } | null = null;
 let toasts: Toast[] = [];
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
@@ -51,6 +53,12 @@ export function toast(text: string, tone?: "error") {
   }, 3600);
 }
 
+// 오래 걸리는 작업(zip 등) 진행 표시. null 이면 숨김
+export function setProgress(p: { label: string; done: number; total: number } | null) {
+  progress = p;
+  emit();
+}
+
 export function toastError(e: unknown) {
   toast(e instanceof Error ? e.message : "문제가 생겼어요", "error");
 }
@@ -66,11 +74,38 @@ function close(value: boolean | string | null) {
 export function OverlayHost() {
   const current = useSyncExternalStore(subscribe, () => dialog, () => null);
   const list = useSyncExternalStore(subscribe, () => toasts, () => toasts);
+  const job = useSyncExternalStore(subscribe, () => progress, () => null);
   return (
     <>
       <Modal open={!!current} onClose={() => close(null)} width={400}>
         {current && <DialogBody key={current.title} d={current} />}
       </Modal>
+      <AnimatePresence>
+        {job && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16, transition: { duration: 0.2 } }}
+            transition={{ duration: 0.35, ease: EASE }}
+            className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-[80] w-72 rounded-lg bg-ink p-4 text-on-ink shadow-[var(--shadow-lg)]"
+          >
+            <div className="flex items-center justify-between gap-3 text-[14px] font-semibold">
+              <span className="truncate">{job.label}</span>
+              <span className="shrink-0 tabular-nums opacity-70">
+                {job.done}/{job.total}
+              </span>
+            </div>
+            <div className="mt-3 h-1 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--on-ink)_20%,transparent)]">
+              <motion.div
+                className="h-full origin-left rounded-full bg-on-ink"
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: job.total ? job.done / job.total : 0 }}
+                transition={{ duration: 0.3, ease: EASE }}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[80] flex flex-col items-center gap-2 px-4">
         <AnimatePresence>
           {list.map((t) => (
@@ -114,11 +149,12 @@ function DialogBody({ d }: { d: Ask | Prompt }) {
       {d.kind === "prompt" && (
         <input
           autoFocus
+          onFocus={(e) => e.currentTarget.select()}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={d.placeholder}
           maxLength={60}
-          className="mt-4 h-12 w-full rounded-md bg-surface-2 px-4 text-[15px] outline-none placeholder:text-mute focus:ring-2 focus:ring-ink"
+          className="mt-4 h-12 w-full rounded-md bg-surface-2 px-4 text-[15px] outline-none placeholder:text-mute focus:ring-1 focus:ring-ink/25"
         />
       )}
       <div className="mt-6 flex justify-end gap-2">
@@ -186,50 +222,80 @@ export function Modal({
   );
 }
 
-// 트리거 아래에 뜨는 메뉴
+// 트리거 옆에 뜨는 메뉴. 접힘 애니메이션(overflow-hidden)이나 스크롤 영역에 잘리지 않게 body 로 포털해 fixed 로 띄운다.
 export function Popover({
   trigger,
   children,
   align = "start",
   side = "bottom",
 }: {
-  trigger: (props: { open: boolean; toggle: () => void }) => React.ReactNode;
+  trigger: (props: { open: boolean; toggle: (e: React.MouseEvent<HTMLElement>) => void }) => React.ReactNode;
   children: (close: () => void) => React.ReactNode;
   align?: "start" | "end";
   side?: "bottom" | "top";
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const anchor = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const close = () => setOpen(false);
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!anchor.current?.contains(t) && !menu.current?.contains(t)) close();
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("pointerdown", onDown);
     window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
     return () => {
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
     };
   }, [open]);
+
+  // 위치는 클릭한 트리거 요소에서 읽는다 (렌더 중 ref 접근 금지)
+  const toggle = (e: React.MouseEvent<HTMLElement>) => {
+    if (!open) setRect(e.currentTarget.getBoundingClientRect());
+    setOpen((o) => !o);
+  };
+
+  const style: React.CSSProperties = rect
+    ? {
+        position: "fixed",
+        ...(side === "bottom" ? { top: rect.bottom + 6 } : { bottom: window.innerHeight - rect.top + 6 }),
+        ...(align === "start" ? { left: Math.max(8, rect.left) } : { right: Math.max(8, window.innerWidth - rect.right) }),
+        transformOrigin: `${side === "bottom" ? "top" : "bottom"} ${align === "start" ? "left" : "right"}`,
+      }
+    : {};
+
   return (
-    <div ref={ref} className="relative">
-      {trigger({ open, toggle: () => setOpen((o) => !o) })}
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: side === "bottom" ? -4 : 4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.12 } }}
-            transition={{ duration: 0.22, ease: EASE }}
-            style={{ transformOrigin: `${side === "bottom" ? "top" : "bottom"} ${align === "start" ? "left" : "right"}` }}
-            className={`absolute z-50 min-w-56 rounded-lg bg-surface p-1.5 shadow-[var(--shadow-lg)] ${
-              side === "bottom" ? "top-full mt-1.5" : "bottom-full mb-1.5"
-            } ${align === "start" ? "left-0" : "right-0"}`}
-          >
-            {children(() => setOpen(false))}
-          </motion.div>
+    <div ref={anchor} className="relative">
+      {trigger({ open, toggle })}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <AnimatePresence>
+            {open && rect && (
+              <motion.div
+                ref={menu}
+                initial={{ opacity: 0, scale: 0.96, y: side === "bottom" ? -4 : 4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.12 } }}
+                transition={{ duration: 0.22, ease: EASE }}
+                style={style}
+                className="z-[75] max-h-[min(420px,70dvh)] min-w-56 overflow-y-auto rounded-lg bg-surface p-1.5 text-ink shadow-[var(--shadow-lg)]"
+              >
+                {children(() => setOpen(false))}
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </div>
   );
 }
