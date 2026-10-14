@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/client/api";
 import { EASE, toastError } from "@/components/ui/overlay";
+import { LogoMark } from "@/components/ui/Logo";
 
 // 마지막으로 쓰던 워크스페이스로 보내고, 없으면 처음 하나를 만든다
 export default function Home() {
@@ -55,7 +56,8 @@ export default function Home() {
   return (
     <main className="grid min-h-dvh place-items-center px-4">
       <motion.form onSubmit={create} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="w-full max-w-[420px]">
-        <h1 className="text-[28px] font-bold">워크스페이스를 만들어요</h1>
+        <LogoMark size={44} />
+        <h1 className="mt-6 text-[28px] font-bold">워크스페이스를 만들어요</h1>
         <p className="mt-2 text-[15px] text-ink-2">진행하는 사업 아이템 이름으로 지으면 좋아요. 팀원은 나중에 초대할 수 있어요.</p>
         <div className="mt-8 flex items-center gap-2 rounded-lg bg-surface p-1.5 shadow-[var(--shadow)]">
           <input

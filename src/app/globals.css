@@ -16,6 +16,7 @@
   --music: #5f6670;
   --danger: #c62a28;
   --ring: #161616;
+  --logo-back: #5c5c59;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
   --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.14);
 
@@ -41,6 +42,7 @@
   --music: #a3aab4;
   --danger: #ff6b68;
   --ring: #f2f2ef;
+  --logo-back: #a3a39e;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
   --shadow-lg: 0 16px 48px rgb(0 0 0 / 0.6);
 }

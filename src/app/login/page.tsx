@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/browser";
 import { EASE } from "@/components/ui/overlay";
+import { LogoMark } from "@/components/ui/Logo";
 
 function nextPath() {
   if (typeof window === "undefined") return "/";
@@ -61,8 +62,8 @@ export default function LoginPage() {
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-12">
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }} className="w-full max-w-[380px]">
-        <div className="grid size-11 place-items-center rounded-md bg-ink text-[18px] font-bold text-on-ink">R</div>
-        <h1 className="mt-6 text-[28px] font-bold">레퍼런스 보관함</h1>
+        <LogoMark size={52} />
+        <h1 className="mt-6 text-[28px] font-[800] tracking-[-0.03em]">레퍼런스 보관함</h1>
         <p className="mt-2 text-[15px] text-ink-2">인스타 레퍼런스를 팀과 함께 모으고 분석용으로 내려받아요.</p>
 
         <button
