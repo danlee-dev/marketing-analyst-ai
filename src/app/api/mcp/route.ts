@@ -4,7 +4,9 @@ import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { z } from "zod";
 import { ingestLink } from "@/lib/ingest";
-import { postMarkdown, formatLabel } from "@/lib/markdown";
+import { fileExt, postMarkdown, formatLabel } from "@/lib/markdown";
+import { safeName } from "@/lib/naming";
+import { signPath } from "@/lib/signed";
 import { detect, SOURCE_LABEL } from "@/lib/sources/detect";
 import { supabaseAdmin } from "@/lib/supabase/server";
 import { FORMAT_GROUP, type Folder, type Post } from "@/lib/types";
@@ -13,6 +15,22 @@ import { FORMAT_GROUP, type Folder, type Post } from "@/lib/types";
 // 인증은 개인 토큰(api_tokens), 데이터 접근은 관리 클라이언트 + 워크스페이스 멤버십 확인으로 범위를 좁힌다.
 
 export const maxDuration = 300;
+
+// 도구 안에서는 요청 객체가 없어서, 서명 링크에 쓸 사이트 주소를 요청마다 기억해 둔다 (배포마다 같은 값)
+let origin = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3017";
+
+const INSTRUCTIONS = `레퍼런스 보관함: 팀이 모은 인스타·YouTube·X·TikTok·웹 레퍼런스를 워크스페이스 > 프로젝트 > 폴더 구조로 읽고, 분석을 메모로 남기는 서버.
+
+작업 순서
+1. list_workspaces → list_projects 로 구조를 보고, list_references 로 대상을 고른다.
+2. get_reference 로 캡션·본문·영상 전사(말/노래 구분)·지표·이미지를 읽는다.
+3. 영상(릴스·쇼츠·X 영상)의 화면까지 분석해야 하면 get_media_links 로 원본 파일 임시 링크를 받아
+   로컬에서 내려받고(curl -L -o) ffmpeg 로 프레임을 뽑아 이미지로 본다.
+   예) ffmpeg -i video.mp4 -vf "select='eq(n,0)+gt(scene,0.3)',scale=720:-2" -vsync vfr frames/%03d.jpg
+   장면 전환이 너무 많거나 적으면 -vf "fps=1/2,scale=720:-2" 로 2초 간격.
+   훅 분석에는 첫 3초를 촘촘히: ffmpeg -t 3 -i video.mp4 -vf fps=4 hook/%02d.jpg
+4. 분석 결과는 save_note 로 해당 레퍼런스 메모에 남긴다 (팀원도 사이트에서 본다). 여러 개를 비교한 종합 분석은 대표 레퍼런스나 사용자가 지정한 곳에 남긴다.
+5. 새 링크는 add_reference 로 저장한다.`;
 
 type Ctx = { http?: { authInfo?: AuthInfo } };
 const userOf = (ctx: Ctx) => (ctx.http?.authInfo?.extra as { userId?: string } | undefined)?.userId ?? "";
@@ -159,7 +177,7 @@ const handler = createMcpHandler(
       {
         title: "레퍼런스 읽기",
         description:
-          "레퍼런스 하나의 전체 내용: 출처·계정·지표·캡션·본문(아티클/글)·영상 전사(말/노래 구분)·메모. include_images 면 썸네일과 사진을 이미지로 함께 준다 (영상 파일 자체는 주지 않음).",
+          "레퍼런스 하나의 전체 내용: 출처·계정·지표·캡션·본문(아티클/글)·영상 전사(말/노래 구분)·메모. include_images 면 썸네일과 사진을 이미지로 함께 준다. 영상 화면 분석은 get_media_links 로 원본을 받아 로컬에서 프레임을 나눈다.",
         inputSchema: z.object({
           id: z.string().uuid(),
           include_images: z.boolean().default(true),
@@ -181,6 +199,62 @@ const handler = createMcpHandler(
           }
         }
         return { content };
+      },
+    );
+
+    server.registerTool(
+      "get_media_links",
+      {
+        title: "원본 파일 링크",
+        description:
+          "레퍼런스의 원본 영상·사진·첨부 파일을 내려받을 임시 링크(기본 1시간). 영상 화면 분석이 필요할 때 받아서 로컬에서 ffmpeg 로 프레임을 나눠 본다. YouTube·TikTok 은 원본 영상 파일이 없고 썸네일만 있다.",
+        inputSchema: z.object({
+          id: z.string().uuid(),
+          kinds: z.array(z.enum(["video", "image", "attachment", "thumbnail"])).default(["video", "image", "thumbnail"]),
+          ttl_minutes: z.number().int().min(5).max(1440).default(60),
+        }),
+      },
+      async ({ id, kinds, ttl_minutes }, ctx) => {
+        const { data } = await supabaseAdmin().from("posts").select("*").eq("id", id).maybeSingle();
+        const post = data as Post | null;
+        if (!post || !(await allowedWs(userOf(ctx))).has(post.workspace_id)) return fail("접근할 수 있는 레퍼런스가 아니에요.");
+        const base = safeName(`${post.account.username}_${post.title}`, 40).replace(/\s+/g, "_");
+        const files: { kind: string; name: string; url: string; size?: number; seconds?: number }[] = [];
+        const ttl = ttl_minutes * 60;
+        for (const m of post.media) {
+          if (!kinds.includes(m.kind)) continue;
+          const name = `${base}_${String(m.index).padStart(2, "0")}.${fileExt(m.path)}`;
+          files.push({ kind: m.kind, name, url: signPath(origin, m.path, name, ttl).url, size: m.size, seconds: m.duration });
+        }
+        if (kinds.includes("thumbnail") && post.thumb_path && !post.media.some((m) => m.path === post.thumb_path)) {
+          const name = `${base}_thumb.${fileExt(post.thumb_path)}`;
+          files.push({ kind: "thumbnail", name, url: signPath(origin, post.thumb_path, name, ttl).url });
+        }
+        if (kinds.includes("attachment")) {
+          for (const a of post.attachments) files.push({ kind: "attachment", name: a.name, url: signPath(origin, a.path, a.name, ttl).url, size: a.size });
+        }
+        if (!files.length) {
+          return text(
+            post.source === "youtube" || post.source === "tiktok"
+              ? `${SOURCE_LABEL[post.source]} 레퍼런스는 원본 영상 파일을 저장하지 않아요. 전사와 썸네일은 get_reference 로 볼 수 있어요. 원본: ${post.url}`
+              : "내려받을 파일이 없어요.",
+          );
+        }
+        const mb = (b?: number) => (b ? ` ${(b / 1e6).toFixed(1)}MB` : "");
+        const lines = files.map((f) => `- ${f.kind} ${f.name}${mb(f.size)}${f.seconds ? ` ${Math.round(f.seconds)}초` : ""}\n  ${f.url}`);
+        const dir = `refs/${base}`;
+        const curl = files.map((f) => `curl -sL -o "${dir}/${f.name}" "${f.url}"`).join("\n");
+        const videos = files.filter((f) => f.kind === "video");
+        const ff = videos
+          .map((f) => {
+            const stem = f.name.replace(/\.[^.]+$/, "");
+            return `mkdir -p "${dir}/${stem}_frames" && ffmpeg -loglevel error -i "${dir}/${f.name}" -vf "select='eq(n,0)+gt(scene,0.3)',scale=720:-2" -vsync vfr "${dir}/${stem}_frames/%03d.jpg"`;
+          })
+          .join("\n");
+        return text(
+          `# ${post.title} 원본 파일 (${ttl_minutes}분 동안 유효)\n\n${lines.join("\n")}\n\n내려받기:\n\`\`\`bash\nmkdir -p "${dir}"\n${curl}\n\`\`\`` +
+            (ff ? `\n\n프레임 나누기 (장면 전환마다):\n\`\`\`bash\n${ff}\n\`\`\`` : ""),
+        );
       },
     );
 
@@ -248,7 +322,7 @@ const handler = createMcpHandler(
       },
     );
   },
-  { serverInfo: { name: "reference-box", version: "1.0.0" } },
+  { serverInfo: { name: "reference-box", version: "1.1.0" }, instructions: INSTRUCTIONS },
 );
 
 async function verifyToken(_req: Request, bearer?: string): Promise<AuthInfo | undefined> {
@@ -263,4 +337,9 @@ async function verifyToken(_req: Request, bearer?: string): Promise<AuthInfo | u
 
 const authed = withMcpAuth(handler, verifyToken, { required: true });
 
-export { authed as GET, authed as POST, authed as DELETE };
+const route = (req: Request) => {
+  origin = new URL(req.url).origin;
+  return authed(req);
+};
+
+export { route as GET, route as POST, route as DELETE };
