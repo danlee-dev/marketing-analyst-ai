@@ -98,9 +98,13 @@ h3 {
   color: var(--on-ink);
 }
 
-:focus-visible {
+/* 키보드 포커스 링은 버튼·링크에만. 입력칸은 focus:ring-1 로 은은하게 */
+:where(button, a, summary, select, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+:where(input, textarea):focus-visible {
+  outline: none;
 }
 
 /* Apple 식 연속 곡선 모서리. 지원 브라우저에서만, 같은 값이면 덜 둥글어 보여 1.4배 */
