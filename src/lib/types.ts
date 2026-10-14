@@ -47,25 +47,69 @@ export type Account = {
   profilePicPath?: string;
 };
 
+// DB 행 그대로 (snake_case)
 export type Post = {
   id: string;
+  workspace_id: string;
+  project_id: string;
+  folder_id: string | null;
+  shortcode: string;
   url: string;
   title: string;
   account: Account;
   caption: string;
   hashtags: string[];
   mentions: string[];
-  takenAt: string;
+  taken_at: string;
   type: "image" | "video" | "carousel";
   likes: number | null;
   comments: number | null;
   views: number | null;
-  music?: string | null;
-  location?: string | null;
+  music: string | null;
+  location: string | null;
   media: MediaItem[];
-  thumbPath: string | null;
+  thumb_path: string | null;
   transcripts: Transcript[];
   attachments: Attachment[];
-  createdAt: string;
-  updatedAt: string;
+  note: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type Workspace = { id: string; name: string; created_by: string; created_at: string };
+
+export type Project = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string | null;
+  position: number;
+  created_at: string;
+};
+
+export type Folder = {
+  id: string;
+  workspace_id: string;
+  project_id: string;
+  parent_id: string | null;
+  name: string;
+  position: number;
+};
+
+export type Member = {
+  workspace_id: string;
+  user_id: string;
+  role: "owner" | "member";
+  created_at: string;
+  profile?: { email: string; name: string | null } | null;
+};
+
+export type Invite = {
+  id: string;
+  workspace_id: string;
+  token: string;
+  role: "owner" | "member";
+  created_at: string;
+  expires_at: string;
+  revoked: boolean;
 };
