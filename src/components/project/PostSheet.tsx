@@ -9,6 +9,8 @@ import { isNoAudio, type Post, type Project, type TranscriptLine } from "@/lib/t
 import { EASE, Popover } from "../ui/overlay";
 import { useWorkspace } from "../workspace/context";
 import { MoveMenu } from "./SelectionBar";
+import ReactMarkdown from "react-markdown";
+import { SOURCE_LABEL } from "@/lib/sources/detect";
 
 const n = (v: number | null) => (v == null ? null : v.toLocaleString("ko-KR"));
 const size = (b: number) => (b > 1e6 ? `${(b / 1e6).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1e3))}KB`);
@@ -156,6 +158,28 @@ function Body({ post, project, busy, uploading, onClose, onChange, onUpload, onR
           )}
         </div>
 
+        {post.source === "youtube" ? (
+          <div className={`mt-5 overflow-hidden rounded-lg bg-surface-2 ${post.site?.includes("shorts") ? "mx-auto aspect-[9/16] max-h-[70dvh]" : "aspect-video"}`}>
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${post.shortcode}`}
+              title={post.title}
+              allow="accelerometer; encrypted-media; picture-in-picture"
+              allowFullScreen
+              className="size-full"
+            />
+          </div>
+        ) : post.source === "tiktok" ? (
+          <div className="mx-auto mt-5 aspect-[9/16] max-h-[75dvh] overflow-hidden rounded-lg bg-surface-2">
+            <iframe src={`https://www.tiktok.com/embed/v2/${post.shortcode}`} title={post.title} allow="encrypted-media" className="size-full" />
+          </div>
+        ) : !post.media.length ? (
+          post.thumb_path ? (
+            <a href={post.url} target="_blank" rel="noreferrer" className="mt-5 block overflow-hidden rounded-lg bg-surface-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={fileUrl(post.thumb_path)} alt="" className="w-full object-cover" />
+            </a>
+          ) : null
+        ) : (
         <div className="mt-5">
           <div
             ref={scroller}
@@ -188,14 +212,17 @@ function Body({ post, project, busy, uploading, onClose, onChange, onUpload, onR
             </div>
           )}
         </div>
+        )}
 
         <div className="mt-5 flex flex-wrap gap-2">
           <Action onClick={onDownload} primary>
-            <Download size={16} /> 이 게시물 받기
+            <Download size={16} /> zip 받기
           </Action>
-          <Action href={post.url}>
-            <ArrowUpRight size={16} /> 인스타에서 보기
-          </Action>
+          {post.url && (
+            <Action href={post.url}>
+              <ArrowUpRight size={16} /> {post.source === "web" ? "사이트 열기" : `${SOURCE_LABEL[post.source]}에서 보기`}
+            </Action>
+          )}
         </div>
         {post.music && <p className="mt-3 text-[14px] text-ink-2">음악 · {post.music}</p>}
 
@@ -210,11 +237,32 @@ function Body({ post, project, busy, uploading, onClose, onChange, onUpload, onR
           />
         </Section>
 
-        <Section title="캡션">
-          <p className="whitespace-pre-wrap text-[15px] leading-[1.7] text-ink-2">{post.caption || "캡션 없음"}</p>
-        </Section>
+        {post.caption && post.format !== "text" && post.format !== "note" && (
+          <Section title={post.source === "web" ? "요약" : "캡션"}>
+            <p className="whitespace-pre-wrap text-[15px] leading-[1.7] text-ink-2">{post.caption}</p>
+          </Section>
+        )}
 
-        {videos.length > 0 && (
+        {post.body && post.body.trim() !== post.caption.trim() || post.format === "text" || post.format === "note" ? (
+          <Section title={post.format === "article" ? "본문" : "내용"}>
+            <div className="prose-ref text-[15px] leading-[1.75] text-ink-2">
+              <ReactMarkdown
+                components={{
+                  a: ({ href, children }) => (
+                    <a href={href} target="_blank" rel="noreferrer" className="text-ink underline underline-offset-4">
+                      {children}
+                    </a>
+                  ),
+                  img: () => null,
+                }}
+              >
+                {(post.body || post.caption).slice(0, 40_000)}
+              </ReactMarkdown>
+            </div>
+          </Section>
+        ) : null}
+
+        {(videos.length > 0 || post.transcripts.length > 0) && (
           <Section
             title="영상 전사"
             action={
@@ -222,7 +270,7 @@ function Body({ post, project, busy, uploading, onClose, onChange, onUpload, onR
                 <span className="flex items-center gap-1.5 text-[14px] text-ink-2">
                   <Loader2 size={14} className="animate-spin" /> 전사 중
                 </span>
-              ) : (
+              ) : !videos.length ? null : (
                 <button onClick={onTranscribe} className="press flex h-9 items-center gap-1.5 rounded-md px-3 text-[14px] text-ink-2 hover:bg-surface-2">
                   {post.transcripts.length ? <RotateCw size={14} /> : <Mic size={14} />}
                   {post.transcripts.length ? "다시 전사" : "전사하기"}

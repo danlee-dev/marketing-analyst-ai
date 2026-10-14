@@ -1,12 +1,14 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { Menu } from "lucide-react";
+import { Menu, PanelLeftOpen } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { EASE } from "../ui/overlay";
 import { DotField } from "../ui/DotField";
 import { WorkspaceProvider, useWorkspace } from "./context";
+import { ClaudeDialog } from "./ClaudeConnect";
 import { SettingsDialog } from "./SettingsDialog";
 import { Sidebar } from "./Sidebar";
 
@@ -16,13 +18,48 @@ export function Shell({ children }: { children: React.ReactNode }) {
     <WorkspaceProvider wsId={ws}>
       <Frame>{children}</Frame>
       <SettingsDialog />
+      <ClaudeDialog />
     </WorkspaceProvider>
   );
 }
 
+// 사이드바 접힘 상태는 브라우저에 기억 (서버 렌더는 펼친 상태)
+const collapseListeners = new Set<() => void>();
+const subscribeCollapsed = (l: () => void) => {
+  collapseListeners.add(l);
+  return () => collapseListeners.delete(l);
+};
+const readCollapsed = () => {
+  try {
+    return localStorage.getItem("sidebarCollapsed") === "1";
+  } catch {
+    return false;
+  }
+};
+const writeCollapsed = (v: boolean) => {
+  try {
+    localStorage.setItem("sidebarCollapsed", v ? "1" : "0");
+  } catch {}
+  collapseListeners.forEach((l) => l());
+};
+
 function Frame({ children }: { children: React.ReactNode }) {
   const w = useWorkspace();
   const [drawer, setDrawer] = useState(false);
+  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false);
+  const toggle = () => writeCollapsed(!readCollapsed());
+
+  // ⌘\ (Ctrl+\) 로 사이드바 접기
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        toggle();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   if (w.missing) {
     return (
@@ -40,9 +77,22 @@ function Frame({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-dvh">
-      <aside className="hidden w-[272px] shrink-0 lg:block">
-        <Sidebar />
-      </aside>
+      <motion.aside
+        initial={false}
+        animate={{ width: collapsed ? 0 : 272 }}
+        transition={{ duration: 0.4, ease: EASE }}
+        className="hidden shrink-0 overflow-hidden lg:block"
+        aria-hidden={collapsed}
+      >
+        <motion.div
+          initial={false}
+          animate={{ x: collapsed ? -32 : 0, opacity: collapsed ? 0 : 1 }}
+          transition={{ duration: collapsed ? 0.2 : 0.4, ease: EASE }}
+          className="h-full w-[272px]"
+        >
+          <Sidebar onCollapse={toggle} />
+        </motion.div>
+      </motion.aside>
 
       <AnimatePresence>
         {drawer && (
@@ -61,8 +111,26 @@ function Frame({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      <div className="relative min-w-0 flex-1 overflow-hidden bg-surface lg:my-2 lg:mr-2 lg:rounded-xl lg:shadow-[var(--shadow)]">
+      <div
+        className={`relative min-w-0 flex-1 overflow-hidden bg-surface transition-[margin] duration-300 lg:my-2 lg:mr-2 lg:rounded-xl lg:shadow-[var(--shadow)] ${collapsed ? "lg:ml-2" : ""}`}
+      >
         <DotField />
+        <AnimatePresence>
+          {collapsed && (
+            <motion.button
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+              transition={{ duration: 0.3, ease: EASE, delay: 0.15 }}
+              onClick={toggle}
+              aria-label="사이드바 펼치기 (⌘\)"
+              title="사이드바 펼치기 (⌘\)"
+              className="press absolute left-3 top-3 z-30 hidden size-10 place-items-center rounded-md bg-surface text-ink-2 shadow-[var(--shadow)] hover:text-ink lg:grid"
+            >
+              <PanelLeftOpen size={18} />
+            </motion.button>
+          )}
+        </AnimatePresence>
         <main id="main" className="relative h-full overflow-y-auto">
         <div className="sticky top-0 z-20 flex h-14 items-center gap-2 bg-surface px-3 pt-[env(safe-area-inset-top)] lg:hidden">
           <button aria-label="메뉴" onClick={() => setDrawer(true)} className="press grid size-10 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
