@@ -41,7 +41,7 @@ pnpm dev
 사이트 사이드바의 "내 Claude 연결"에서 토큰을 만든 뒤:
 
 ```bash
-claude mcp add --transport http reference-box https://<도메인>/api/mcp --header "Authorization: Bearer <토큰>"
+claude mcp add --scope user --transport http reference-box https://<도메인>/api/mcp --header "Authorization: Bearer <토큰>"
 ```
 
 도구: `list_workspaces`, `list_projects`, `list_references`, `get_reference`(본문·전사·이미지), `get_media_links`(원본 영상·사진 임시 링크), `search_references`, `save_note`, `add_reference`.
