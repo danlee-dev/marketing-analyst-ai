@@ -62,8 +62,8 @@ export function IngestBox({
               submit();
             }
           }}
-          placeholder={placeholder ?? "인스타 게시물·릴스 링크를 붙여넣으세요. 여러 개도 한 번에 돼요."}
-          className="no-scrollbar max-h-[200px] min-h-12 flex-1 resize-none bg-transparent px-3.5 py-3 text-[15px] leading-6 outline-none placeholder:text-mute"
+          placeholder={placeholder ?? "인스타 링크를 붙여넣으세요"}
+          className="no-scrollbar max-h-[200px] min-h-12 min-w-0 flex-1 resize-none bg-transparent px-3.5 py-3 text-[15px] leading-6 outline-none placeholder:text-mute"
         />
         <motion.button
           type="button"

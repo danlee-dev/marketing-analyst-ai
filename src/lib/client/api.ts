@@ -49,8 +49,12 @@ export const db = {
 
   workspaces: async () =>
     must<Workspace[]>(await sb().from("workspaces").select("*").order("created_at", { ascending: true })),
-  createWorkspace: async (name: string) =>
-    must<Workspace>(await sb().from("workspaces").insert({ name }).select("*").single()),
+  // insert 직후 RETURNING 은 아직 멤버가 아니라 RLS 에 막힌다 (owner 등록은 같은 문장의 트리거). id 를 먼저 정하고 따로 읽는다.
+  createWorkspace: async (name: string) => {
+    const id = crypto.randomUUID();
+    must(await sb().from("workspaces").insert({ id, name }));
+    return must<Workspace>(await sb().from("workspaces").select("*").eq("id", id).single());
+  },
   renameWorkspace: async (id: string, name: string) => must(await sb().from("workspaces").update({ name }).eq("id", id)),
   deleteWorkspace: async (id: string) => must(await sb().from("workspaces").delete().eq("id", id)),
 

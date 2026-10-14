@@ -20,7 +20,13 @@ import { PostCard } from "./PostCard";
 import { PostSheet } from "./PostSheet";
 import { SelectionBar } from "./SelectionBar";
 
+// 프로젝트가 바뀌면 목록·선택 상태를 새로 시작
 export function ProjectView() {
+  const { project } = useParams<{ project: string }>();
+  return <ProjectBody key={project} />;
+}
+
+function ProjectBody() {
   const w = useWorkspace();
   const router = useRouter();
   const params = useParams<{ ws: string; project: string; f?: string[] }>();
@@ -296,15 +302,15 @@ export function ProjectView() {
           </>
         )}
       </nav>
-      <motion.h1 key={current?.id ?? project.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="mt-1 text-[28px] font-bold sm:text-[36px]">
+      <motion.h1 key={`title-${current?.id ?? project.id}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: EASE }} className="mt-1 text-[28px] font-bold sm:text-[36px]">
         {current?.name ?? project.name}
       </motion.h1>
-      {!current && <Description key={project.id} />}
+      {!current && <Description key={`desc-${project.id}`} />}
 
       <div className="mt-8 max-w-2xl">
         <IngestBox
           jobs={jobs}
-          placeholder={`인스타 링크를 붙여넣으면 '${current?.name ?? project.name}'에 저장돼요. 여러 개도 한 번에 돼요.`}
+          placeholder="인스타 링크를 붙여넣으세요"
           onSubmit={enqueue}
           onRetry={(job) => {
             setJobs((js) => js.filter((j) => j.key !== job.key));

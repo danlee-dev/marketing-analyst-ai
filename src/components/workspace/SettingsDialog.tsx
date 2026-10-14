@@ -25,18 +25,37 @@ function Body() {
   const [copied, setCopied] = useState<string | null>(null);
   const link = (token: string) => `${window.location.origin}/invite/${token}`;
 
-  async function copy(token: string) {
-    await navigator.clipboard.writeText(link(token));
-    setCopied(token);
-    setTimeout(() => setCopied(null), 1600);
+  // 클립보드 권한이 없으면 숨긴 textarea + execCommand 로 한 번 더 시도
+  async function copy(token: string): Promise<boolean> {
+    const text = link(token);
+    let ok = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      ok = true;
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        ok = document.execCommand("copy");
+      } catch {}
+      ta.remove();
+    }
+    if (ok) {
+      setCopied(token);
+      setTimeout(() => setCopied(null), 1600);
+    }
+    return ok;
   }
 
   async function createLink() {
     try {
       const inv = await db.createInvite(ws.id);
       w.setInvites((l) => [inv, ...l]);
-      await copy(inv.token);
-      toast("초대 링크를 복사했어요. 팀원에게 보내 주세요");
+      toast((await copy(inv.token)) ? "초대 링크를 복사했어요. 팀원에게 보내 주세요" : "초대 링크를 만들었어요. 아래 링크를 복사해 보내 주세요");
     } catch (e) {
       toastError(e);
     }
@@ -93,7 +112,7 @@ function Body() {
             className="overflow-hidden"
           >
             <div className="mt-3 flex items-center gap-2 rounded-md bg-surface-2 py-1.5 pl-4 pr-1.5">
-              <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink-2">{link(inv.token)}</span>
+              <span className="min-w-0 flex-1 select-all truncate font-mono text-[13px] text-ink-2">{link(inv.token)}</span>
               <button onClick={() => copy(inv.token)} className="press flex h-9 items-center gap-1.5 rounded-sm px-3 text-[13px] font-semibold hover:bg-surface-3">
                 {copied === inv.token ? <Check size={14} /> : <Copy size={14} />}
                 {copied === inv.token ? "복사됨" : "복사"}
