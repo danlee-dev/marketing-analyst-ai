@@ -1,7 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Check, Copy, Folder as FolderIcon, Loader2, Paperclip, Play } from "lucide-react";
+import { Check, Copy, Folder as FolderIcon, Globe, Loader2, Paperclip, Play } from "lucide-react";
+import { FORMAT_LABEL, formatLabel } from "@/lib/markdown";
+import { SOURCE_LABEL } from "@/lib/sources/detect";
 import { useState } from "react";
 import { fileUrl } from "@/lib/client/api";
 import { isNoAudio, type Post } from "@/lib/types";
@@ -36,6 +38,25 @@ export function PostCard({
   const [over, setOver] = useState(false);
   const [dragging, setDragging] = useState(false);
   const videos = post.media.filter((m) => m.kind === "video").length;
+  const shorts = post.source === "youtube" && post.site?.includes("shorts");
+  const textCard = (post.format === "text" || post.format === "note" || post.format === "article") && !post.thumb_path;
+  const frame = textCard
+    ? ""
+    : post.source === "youtube" && !shorts
+      ? "aspect-video"
+      : post.format === "page" || post.format === "article"
+        ? "aspect-[16/10]"
+        : "aspect-[4/5]";
+  const badge =
+    post.source === "web"
+      ? (post.site ?? "웹")
+      : post.source === "upload"
+        ? post.format === "note" ? "메모" : "직접 추가"
+        : post.format === "carousel"
+          ? String(post.media.length)
+          : formatLabel(post) === FORMAT_LABEL[post.format] ? SOURCE_LABEL[post.source] : `${SOURCE_LABEL[post.source]} ${formatLabel(post)}`;
+  const badgeIcon =
+    post.format === "carousel" ? <Copy size={11} /> : post.format === "video" ? <Play size={10} fill="currentColor" /> : post.source === "web" ? <Globe size={11} /> : null;
   const done = post.transcripts.filter((t) => t.status === "done" || isNoAudio(t)).length;
 
   return (
@@ -71,28 +92,32 @@ export function PostCard({
         <motion.div
           animate={{ scale: over ? 0.97 : selected ? 0.94 : 1 }}
           transition={{ duration: 0.25, ease: EASE }}
-          className={`relative aspect-[4/5] cursor-pointer overflow-hidden rounded-lg bg-surface-2 outline-2 outline-offset-[3px] transition-[outline-color] ${
+          className={`relative cursor-pointer overflow-hidden rounded-lg bg-surface-2 outline-2 outline-offset-[3px] transition-[outline-color] ${frame} ${
             selected || over ? "outline-ink" : "outline-transparent"
           }`}
           onClick={(e) => (selecting ? onToggle(e.shiftKey) : onOpen())}
         >
-          {post.thumb_path && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={fileUrl(post.thumb_path)}
-              alt=""
-              loading="lazy"
-              draggable={false}
-              className="size-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.05,0.7,0.1,1)] group-hover:scale-[1.04]"
-            />
+          {textCard ? (
+            <div className="flex h-full min-h-44 flex-col p-5 pt-12">
+              <p className="line-clamp-[8] whitespace-pre-line text-[14.5px] leading-[1.6] text-ink">{(post.body || post.caption || post.title).slice(0, 600)}</p>
+            </div>
+          ) : (
+            post.thumb_path && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={fileUrl(post.thumb_path)}
+                alt=""
+                loading="lazy"
+                draggable={false}
+                className="size-full object-cover transition-transform duration-500 ease-[cubic-bezier(0.05,0.7,0.1,1)] group-hover:scale-[1.04]"
+              />
+            )
           )}
 
-          {post.type !== "image" && (
-            <span className="absolute right-3 top-3 flex h-6 items-center gap-1 rounded-full bg-black px-2 text-[12px] font-semibold text-white">
-              {post.type === "carousel" ? <Copy size={11} /> : <Play size={10} fill="currentColor" />}
-              {post.type === "carousel" && post.media.length}
-            </span>
-          )}
+          <span className="absolute right-3 top-3 flex h-6 max-w-[70%] items-center gap-1 rounded-full bg-black px-2 text-[12px] font-semibold text-white">
+            {badgeIcon}
+            <span className="truncate">{badge}</span>
+          </span>
 
           <motion.button
             type="button"
@@ -126,7 +151,7 @@ export function PostCard({
       <button type="button" onClick={onOpen} className="mt-3 block w-full px-0.5 text-left">
         <p className="line-clamp-2 text-[15px] font-semibold leading-snug">{post.title}</p>
         <p className="mt-1 flex items-center gap-1.5 truncate text-[13px] text-mute">
-          <span className="truncate">@{post.account.username}</span>
+          <span className="truncate">{post.source === "web" ? (post.account.fullName ?? post.site) : post.source === "upload" ? post.account.username : `@${post.account.username}`}</span>
           <span aria-hidden>·</span>
           <span className="shrink-0">{date(post.taken_at)}</span>
         </p>

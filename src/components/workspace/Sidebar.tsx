@@ -12,6 +12,7 @@ import {
   LogOut,
   Moon,
   MoreHorizontal,
+  PanelLeftClose,
   Pencil,
   Plus,
   Settings,
@@ -36,7 +37,7 @@ export function movedEvent(ids: string[], folderId: string | null, projectId: st
   window.dispatchEvent(new CustomEvent("posts:moved", { detail: { ids, folderId, projectId } }));
 }
 
-export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; onCollapse?: () => void }) {
   const w = useWorkspace();
   const params = useParams<{ ws: string; project?: string; f?: string[] }>();
   const router = useRouter();
@@ -87,7 +88,21 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="flex h-full flex-col px-3 pb-3 pt-3">
-      <WorkspaceSwitcher onNavigate={onNavigate} />
+      <div className="flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <WorkspaceSwitcher onNavigate={onNavigate} />
+        </div>
+        {onCollapse && (
+          <button
+            onClick={onCollapse}
+            aria-label="사이드바 접기 (⌘\)"
+            title="사이드바 접기 (⌘\)"
+            className="press grid size-9 shrink-0 place-items-center rounded-md text-mute hover:bg-surface-2 hover:text-ink"
+          >
+            <PanelLeftClose size={17} />
+          </button>
+        )}
+      </div>
 
       <nav className="mt-4 flex flex-col gap-0.5">
         <NavRow href={ws ? `/w/${ws.id}` : "#"} icon={<Home size={16} />} active={!activeProject} onClick={onNavigate}>
@@ -95,6 +110,10 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         </NavRow>
         <button onClick={() => w.setSettingsOpen(true)} className="press flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[14px] text-ink-2 hover:bg-surface-2 hover:text-ink">
           <UserPlus size={16} /> 팀원 초대
+        </button>
+        <button onClick={() => w.setClaudeOpen(true)} className="press flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[14px] text-ink-2 hover:bg-surface-2 hover:text-ink">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/claude-mark.svg" alt="" width={16} height={16} /> 내 Claude 연결
         </button>
       </nav>
 

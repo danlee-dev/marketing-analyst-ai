@@ -1,6 +1,6 @@
 # 레퍼런스 보관함 (marketing-analyst-ai)
 
-인스타그램 공개 게시물을 링크로 모아 두고, 분석용 묶음(zip)으로 내려받는 1인용 도구.
+인스타·YouTube·X·TikTok·웹 레퍼런스를 워크스페이스/프로젝트/폴더로 모으고, zip 으로 내려받거나 내 Claude 에 MCP 로 연결해 분석하는 팀 도구.
 
 - 링크를 붙여넣으면 사진·영상, 캡션, 계정 정보, 원본 링크를 저장
 - 영상은 Soniox 로 전사하고, 브라우저에서 YAMNet 으로 각 줄을 말 / 노래 / 말+배경음악으로 표시
@@ -24,3 +24,25 @@
 vercel env pull .env.local
 pnpm dev
 ```
+
+## 출처별 수집
+
+| 출처 | 저장 내용 | 방식 |
+|---|---|---|
+| Instagram | 사진·영상, 캡션, 계정, 지표 | 비로그인 doc_id GraphQL |
+| YouTube | 제목, 채널, 썸네일, 자막 | oEmbed + Supadata (`SUPADATA_API_KEY`) |
+| X | 글, 사진·영상, 작성자, 지표 | 공개 syndication 엔드포인트 |
+| TikTok | 제목, 작성자, 썸네일 | oEmbed |
+| 웹 | 본문 마크다운, 대표 이미지 | Readability + turndown (내부망 주소 차단) |
+| 직접 추가 | 캡처·파일·메모 | Blob 업로드 |
+
+## 내 Claude 연결 (MCP)
+
+사이트 사이드바의 "내 Claude 연결"에서 토큰을 만든 뒤:
+
+```bash
+claude mcp add --transport http reference-box https://<도메인>/api/mcp --header "Authorization: Bearer <토큰>"
+```
+
+도구: `list_workspaces`, `list_projects`, `list_references`, `get_reference`(본문·전사·이미지), `search_references`, `save_note`, `add_reference`.
+분석은 사용자 쪽 Claude 가 하므로 서버에서 Claude API 를 호출하지 않는다. 토큰은 sha256 만 저장(`api_tokens`), 모든 도구는 워크스페이스 멤버십으로 범위를 제한한다.

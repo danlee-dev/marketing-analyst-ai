@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       request,
       onBeforeGenerateToken: async (pathname) => {
         const ws = workspaceOfPath(pathname);
-        if (!ws || !/^w\/[0-9a-f-]{36}\/p\/[0-9a-f-]{36}\/attachments\/[^/]+$/.test(pathname)) throw new Error("잘못된 경로");
+        if (!ws || !/^w\/[0-9a-f-]{36}\/p\/[0-9a-f-]{36}\/(attachments|media)\/[^/]+$/.test(pathname)) throw new Error("잘못된 경로");
         if (!(await isMember(ws)).ok) throw new Error("권한 없음");
         return { maximumSizeInBytes: 500 * 1024 * 1024, addRandomSuffix: false, allowOverwrite: true };
       },

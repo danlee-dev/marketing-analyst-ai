@@ -1,78 +1,8 @@
 import { Zip, ZipDeflate, ZipPassThrough, strToU8 } from "fflate";
 import { fileUrl } from "./api";
-import { folderName, fmtTime, KIND_LABEL, kstDate, safeName } from "@/lib/naming";
-import { isNoAudio, type Folder, type Post, type Transcript } from "@/lib/types";
-
-const n = (v: number | null | undefined) => (v == null ? "-" : v.toLocaleString("ko-KR"));
-const kst = (iso: string) =>
-  new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul", dateStyle: "medium", timeStyle: "short" });
-const ext = (path: string) => path.split(".").pop() ?? "bin";
-
-export function transcriptText(post: Post, t: Transcript): string {
-  const head = post.media.length > 1 ? `[미디어 ${String(t.mediaIndex).padStart(2, "0")}]\n` : "";
-  if (isNoAudio(t)) return `${head}(소리 없는 영상)\n`;
-  if (t.status === "error") return `${head}(전사 실패: ${t.error})\n`;
-  const lines = t.lines.map((l) => {
-    const kind = l.kind && l.kind !== "unknown" ? ` (${KIND_LABEL[l.kind]})` : "";
-    return `[${fmtTime(l.start)}]${kind} ${l.text}`;
-  });
-  const music = (t.audio ?? []).filter((a) => a.kind !== "speech" && a.kind !== "silence");
-  const runs = music.length
-    ? "\n오디오 구간: " +
-      music.map((a) => `${fmtTime(a.start)}-${fmtTime(a.end)} ${a.kind === "song" ? "노래" : "음악"}`).join(", ") +
-      "\n"
-    : "";
-  return `${head}${lines.length ? lines.join("\n") : "(말이나 가사 없음)"}\n${runs}`;
-}
-
-export function postMarkdown(post: Post): string {
-  const a = post.account;
-  const transcripts = post.transcripts.map((t) => transcriptText(post, t)).join("\n");
-  const files = post.media.map((m) => `- media/${String(m.index).padStart(2, "0")}.${ext(m.path)} (${m.kind === "video" ? "영상" : "사진"})`);
-  return [
-    `# ${post.title}`,
-    "",
-    `- 링크: ${post.url}`,
-    `- 계정: @${a.username}${a.fullName ? ` (${a.fullName})` : ""}${a.isVerified ? " 인증됨" : ""}`,
-    `- 프로필: ${a.profileUrl}`,
-    `- 게시일: ${kst(post.taken_at)}`,
-    `- 형식: ${post.type === "carousel" ? `캐러셀 ${post.media.length}장` : post.type === "video" ? "릴스/영상" : "사진"}`,
-    `- 좋아요 ${n(post.likes)} · 댓글 ${n(post.comments)}${post.views != null ? ` · 조회 ${n(post.views)}` : ""}`,
-    post.music ? `- 음악: ${post.music}` : "",
-    post.location ? `- 위치: ${post.location}` : "",
-    post.hashtags.length ? `- 해시태그: ${post.hashtags.join(" ")}` : "",
-    "",
-    post.note ? `## 메모\n\n${post.note}\n` : "",
-    "## 캡션",
-    "",
-    post.caption || "(캡션 없음)",
-    "",
-    post.transcripts.length ? "## 영상 전사\n\n(말 / 노래 / 말+배경음악 은 오디오 분류 결과)\n\n" + transcripts : "",
-    "## 파일",
-    "",
-    ...files,
-    ...post.attachments.map((x) => `- attachments/${x.name} (DM 파일)`),
-    "",
-  ]
-    .filter((l, i, arr) => !(l === "" && arr[i - 1] === ""))
-    .join("\n");
-}
-
-function indexMarkdown(posts: Post[], folders: string[]): string {
-  return [
-    `# 인스타 레퍼런스 ${posts.length}개`,
-    "",
-    `내보낸 시각: ${kst(new Date().toISOString())}`,
-    "",
-    "각 폴더의 post.md 에 링크·계정·캡션·전사가 있고, media/ 에 원본 사진·영상, attachments/ 에 DM 으로 받은 파일이 있습니다.",
-    "",
-    ...posts.map(
-      (p, i) =>
-        `${i + 1}. ${folders[i]}/ - @${p.account.username} · ${p.type === "carousel" ? `캐러셀 ${p.media.length}장` : p.type === "video" ? "영상" : "사진"} · ${p.url}`,
-    ),
-    "",
-  ].join("\n");
-}
+import { fileExt as ext, indexMarkdown, postMarkdown, transcriptText } from "@/lib/markdown";
+import { folderName, kstDate, safeName } from "@/lib/naming";
+import type { Folder, Post } from "@/lib/types";
 
 // 폴더 id -> "상위/하위" 경로. base 를 주면 그 폴더 아래 상대 경로만
 function folderPaths(folders: Folder[], base: string | null) {
@@ -116,6 +46,7 @@ export async function downloadZip(
     ? folderName(posts[0])
     : `${safeName(ctx.rootName ?? ctx.projectName, 50)}_${kstDate(new Date().toISOString())}`;
   const fpath = folderPaths(ctx.folders, ctx.baseFolderId ?? null);
+  const fullPath = folderPaths(ctx.folders, null);
   const used = new Map<string, number>();
   const dirs = posts.map((p) => {
     if (single) return root;
@@ -133,14 +64,16 @@ export async function downloadZip(
 
   for (const [i, post] of posts.entries()) {
     const dir = dirs[i];
-    addText(`${dir}/post.md`, postMarkdown(post));
-    addText(`${dir}/caption.txt`, `@${post.account.username}\n${post.url}\n\n${post.caption}\n`);
+    addText(`${dir}/post.md`, postMarkdown(post, { folderPath: post.folder_id ? fullPath(post.folder_id) : undefined }));
+    if (post.caption) addText(`${dir}/caption.txt`, `${post.source === "web" ? post.site : `@${post.account.username}`}\n${post.url}\n\n${post.caption}\n`);
+    if (post.body && (post.format === "article" || post.format === "page")) addText(`${dir}/article.md`, `# ${post.title}\n\n${post.url}\n\n${post.body}\n`);
     if (post.transcripts.length) addText(`${dir}/transcript.txt`, post.transcripts.map((t) => transcriptText(post, t)).join("\n"));
     addText(`${dir}/meta.json`, JSON.stringify(post, null, 2));
     for (const m of post.media) {
       await addBinary(`${dir}/media/${String(m.index).padStart(2, "0")}.${ext(m.path)}`, m.path);
       onProgress(++done, total);
     }
+    if (!post.media.length && post.thumb_path) await addBinary(`${dir}/thumbnail.${ext(post.thumb_path)}`, post.thumb_path).catch(() => {});
     for (const a of post.attachments) {
       await addBinary(`${dir}/attachments/${safeName(a.name, 120)}`, a.path);
       onProgress(++done, total);

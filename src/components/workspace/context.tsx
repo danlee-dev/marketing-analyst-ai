@@ -26,6 +26,8 @@ type Ctx = {
   setWorkspace: React.Dispatch<React.SetStateAction<Workspace | null>>;
   settingsOpen: boolean;
   setSettingsOpen: (v: boolean) => void;
+  claudeOpen: boolean;
+  setClaudeOpen: (v: boolean) => void;
 };
 
 const WorkspaceCtx = createContext<Ctx | null>(null);
@@ -47,6 +49,7 @@ export function WorkspaceProvider({ wsId, children }: { wsId: string; children: 
   const [counts, setCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [claudeOpen, setClaudeOpen] = useState(false);
 
   const refreshCounts = useCallback(() => {
     db.postCounts(wsId).then(setCounts).catch(() => {});
@@ -109,6 +112,8 @@ export function WorkspaceProvider({ wsId, children }: { wsId: string; children: 
         setWorkspace,
         settingsOpen,
         setSettingsOpen,
+        claudeOpen,
+        setClaudeOpen,
       }}
     >
       {children}

@@ -52,6 +52,20 @@ export type Account = {
   profilePicPath?: string;
 };
 
+export type Source = "instagram" | "youtube" | "x" | "tiktok" | "web" | "upload";
+export type Format = "video" | "image" | "carousel" | "text" | "article" | "page" | "note";
+
+// 화면 필터용 형식 묶음
+export const FORMAT_GROUP: Record<Format, "video" | "image" | "text" | "page"> = {
+  video: "video",
+  image: "image",
+  carousel: "image",
+  text: "text",
+  article: "text",
+  note: "text",
+  page: "page",
+};
+
 // DB 행 그대로 (snake_case)
 export type Post = {
   id: string;
@@ -66,7 +80,11 @@ export type Post = {
   hashtags: string[];
   mentions: string[];
   taken_at: string;
-  type: "image" | "video" | "carousel";
+  type: Format;
+  source: Source;
+  format: Format;
+  body: string;
+  site: string | null;
   likes: number | null;
   comments: number | null;
   views: number | null;
