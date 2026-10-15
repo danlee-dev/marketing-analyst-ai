@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { get } from "@vercel/blob";
 import type { AuthInfo } from "@modelcontextprotocol/server";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
@@ -9,6 +8,7 @@ import { safeName } from "@/lib/naming";
 import { signPath } from "@/lib/signed";
 import { detect, SOURCE_LABEL } from "@/lib/sources/detect";
 import { supabaseAdmin } from "@/lib/supabase/server";
+import { userFromToken } from "@/lib/tokenAuth";
 import { FORMAT_GROUP, type Folder, type Post } from "@/lib/types";
 
 // 사용자의 로컬 Claude(Claude Code / Desktop)가 붙는 MCP 서버. 분석은 사용자 쪽 Claude 가 하므로 API 비용이 없다.
@@ -325,14 +325,9 @@ const handler = createMcpHandler(
   { serverInfo: { name: "reference-box", version: "1.1.0" }, instructions: INSTRUCTIONS },
 );
 
-async function verifyToken(_req: Request, bearer?: string): Promise<AuthInfo | undefined> {
-  if (!bearer || !bearer.startsWith("rb_")) return undefined;
-  const sb = supabaseAdmin();
-  const hash = createHash("sha256").update(bearer).digest("hex");
-  const { data } = await sb.from("api_tokens").select("id, user_id").eq("token_hash", hash).maybeSingle();
-  if (!data) return undefined;
-  void sb.from("api_tokens").update({ last_used_at: new Date().toISOString() }).eq("id", data.id).then(() => {});
-  return { token: bearer, clientId: data.user_id, scopes: ["refs"], extra: { userId: data.user_id } };
+async function verifyToken(_req: Request, bearerToken?: string): Promise<AuthInfo | undefined> {
+  const userId = await userFromToken(bearerToken);
+  return userId ? { token: bearerToken!, clientId: userId, scopes: ["refs"], extra: { userId } } : undefined;
 }
 
 const authed = withMcpAuth(handler, verifyToken, { required: true });

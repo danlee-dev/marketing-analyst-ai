@@ -13,6 +13,7 @@ import {
   Moon,
   MoreHorizontal,
   PanelLeftClose,
+  Puzzle,
   Pencil,
   Plus,
   Settings,
@@ -114,6 +115,9 @@ export function Sidebar({ onNavigate, onCollapse }: { onNavigate?: () => void; o
         <button onClick={() => w.setClaudeOpen(true)} className="press flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[14px] text-ink-2 hover:bg-surface-2 hover:text-ink">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/claude-mark.svg" alt="" width={16} height={16} /> 내 Claude 연결
+        </button>
+        <button onClick={() => w.setExtOpen(true)} className="press flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[14px] text-ink-2 hover:bg-surface-2 hover:text-ink">
+          <Puzzle size={16} /> 크롬 확장
         </button>
       </nav>
 
