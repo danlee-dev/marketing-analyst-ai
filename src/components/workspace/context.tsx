@@ -28,6 +28,8 @@ type Ctx = {
   setSettingsOpen: (v: boolean) => void;
   claudeOpen: boolean;
   setClaudeOpen: (v: boolean) => void;
+  extOpen: boolean;
+  setExtOpen: (v: boolean) => void;
 };
 
 const WorkspaceCtx = createContext<Ctx | null>(null);
@@ -50,6 +52,7 @@ export function WorkspaceProvider({ wsId, children }: { wsId: string; children: 
   const [loading, setLoading] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [claudeOpen, setClaudeOpen] = useState(false);
+  const [extOpen, setExtOpen] = useState(false);
 
   const refreshCounts = useCallback(() => {
     db.postCounts(wsId).then(setCounts).catch(() => {});
@@ -114,6 +117,8 @@ export function WorkspaceProvider({ wsId, children }: { wsId: string; children: 
         setSettingsOpen,
         claudeOpen,
         setClaudeOpen,
+        extOpen,
+        setExtOpen,
       }}
     >
       {children}
