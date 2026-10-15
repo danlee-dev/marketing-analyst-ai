@@ -9,6 +9,7 @@ import { EASE } from "../ui/overlay";
 import { DotField } from "../ui/DotField";
 import { WorkspaceProvider, useWorkspace } from "./context";
 import { ClaudeDialog } from "./ClaudeConnect";
+import { ExtensionDialog } from "./ExtensionDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { Sidebar } from "./Sidebar";
 
@@ -19,6 +20,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       <Frame>{children}</Frame>
       <SettingsDialog />
       <ClaudeDialog />
+      <ExtensionDialog />
     </WorkspaceProvider>
   );
 }

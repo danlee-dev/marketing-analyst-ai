@@ -48,3 +48,12 @@ claude mcp add --scope user --transport http reference-box https://<도메인>/a
 
 영상 화면 분석: Claude Code 가 `get_media_links` 로 받은 서명 링크(`/api/dl`, 기본 1시간, HMAC)로 영상을 내려받아 로컬 ffmpeg 로 프레임을 나눠 본다. 서버는 파일만 내준다.
 분석은 사용자 쪽 Claude 가 하므로 서버에서 Claude API 를 호출하지 않는다. 토큰은 sha256 만 저장(`api_tokens`), 모든 도구는 워크스페이스 멤버십으로 범위를 제한한다.
+
+## 크롬 확장
+
+`extension/` (MV3, 빌드 없음). `./scripts/build-extension.sh` 로 `public/reference-box-extension.zip` 생성, 사이트 사이드바 "크롬 확장"에서 받는다.
+
+- 팝업: 저장 위치(워크스페이스/프로젝트/폴더) 고르고 현재 페이지 저장, 메모·화면 캡처·영상 자동 전사
+- 한 번에 가져오기: 인스타 저장됨 컬렉션·프로필, YouTube 채널·재생목록, X 북마크·타임라인을 끝까지 스크롤해 모으고 이미 있는 건 건너뜀. 큐는 서비스 워커에서 계속(팝업 닫아도)
+- 인스타 플로팅 버튼(닫힌 shadow DOM, isTrusted 만), 우클릭 메뉴(링크·캡처·선택 문구 메모·목록 가져오기), Alt+Shift+S
+- 연결: 사이트 `/extension/connect` 가 개인 토큰을 만들어 `content/bridge.js` 로 전달. API 는 `/api/ext/*` (토큰 + 멤버십)
