@@ -87,12 +87,20 @@ export async function fetchIgItem(shortcode: string): Promise<Raw> {
       body,
     });
     lastStatus = res.status;
-    if (!res.ok) continue;
+    if (!res.ok) {
+      // 로그인 요구는 몇 초 기다려 풀리지 않고, 재시도는 막힌 IP 로 요청만 늘린다.
+      // 401 로 내려보내면 확장이 토큰 만료로 알고 연결을 끊으니 502 로.
+      const fail = await res.json().catch(() => null);
+      if (res.status === 401 || fail?.require_login)
+        throw new IgError("인스타가 로그인 없는 조회를 막고 있어요. 인스타에서 게시물을 열고 확장으로 저장해 주세요.", 502);
+      continue;
+    }
     const json = await res.json().catch(() => null);
     item = json?.data?.xdt_api__v1__media__shortcode__web_info?.items?.[0] ?? null;
     if (!item && json?.data) throw new IgError("게시물을 찾을 수 없어요 (비공개이거나 삭제됨)", 404);
   }
-  if (!item) throw new IgError(`인스타가 요청을 막았어요 (HTTP ${lastStatus}). 잠시 뒤 다시 시도하세요.`, 429);
+  if (!item)
+    throw new IgError(`인스타가 요청을 막았어요 (HTTP ${lastStatus}). 잠시 뒤 다시 시도하세요.`, lastStatus === 429 ? 429 : 502);
   return item;
 }
 
