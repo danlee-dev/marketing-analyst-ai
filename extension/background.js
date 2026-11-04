@@ -110,16 +110,22 @@ async function pushRecent(post, existed) {
   await set({ recent: next });
 }
 
+// 결과를 돌려준다. 인스타 플로팅 버튼이 이걸로 "저장했어요" / "저장하지 못했어요" 를 고른다.
 async function saveTab(tab, { withShot } = {}) {
   const d = detect(tab.url);
-  if (!d) return toast(tab.id, "이 페이지는 저장할 수 없어요", "error");
+  if (!d) {
+    await toast(tab.id, "이 페이지는 저장할 수 없어요", "error");
+    return { ok: false };
+  }
   try {
     const shot = (withShot ?? d.source === "web") ? await capture(tab.windowId).catch(() => undefined) : undefined;
     await toast(tab.id, "보관함에 저장하는 중");
     const res = await saveOne({ url: tab.url, screenshot: shot, tabId: tab.id });
     await toast(tab.id, res.existed ? "이미 보관함에 있어요" : `저장했어요 · ${res.post.title}`);
+    return { ok: true, existed: !!res.existed };
   } catch (e) {
     await toast(tab.id, e.message, "error");
+    return { ok: false, error: e.message };
   }
 }
 
@@ -229,8 +235,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         chrome.alarms.clear("rb-pump");
         return { ok: true };
       case "fab-save":
-        if (sender.tab) await saveTab({ ...sender.tab, url: msg.url || sender.tab.url }, { withShot: false });
-        return { ok: true };
+        if (!sender.tab) return { ok: false };
+        return saveTab({ ...sender.tab, url: msg.url || sender.tab.url }, { withShot: false });
       case "fab-collect":
         if (!sender.tab) return { ok: false };
         try {

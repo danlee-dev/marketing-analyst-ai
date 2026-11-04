@@ -72,10 +72,11 @@
     btn.classList.add("busy", "open");
     if (mode === "post") {
       flash("저장하는 중", "", true);
-      chrome.runtime.sendMessage({ type: "fab-save", url: location.href }, () => {
+      // 자세한 에러 문구는 background 가 페이지 토스트로 띄운다
+      chrome.runtime.sendMessage({ type: "fab-save", url: location.href }, (r) => {
         busy = false;
         btn.classList.remove("busy");
-        flash("요청 보냄", "", false);
+        flash(r?.ok ? (r.existed ? "이미 있어요" : "저장했어요") : "저장하지 못했어요", "", false);
       });
     } else {
       flash("끝까지 내리며 모으는 중", "", true);
