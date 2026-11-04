@@ -269,6 +269,7 @@ async function main() {
       note: $("in-note").value,
       screenshot: $("c-shot").checked,
       windowId: tab.windowId,
+      tabId: tab.id,
       transcribe: $("c-tr").checked,
       dest,
     });

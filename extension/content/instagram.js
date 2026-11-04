@@ -88,6 +88,29 @@
     }
   });
 
+  // 게시물 원본 item 을 로그인된 이 탭에서 받는다. 같은 출처 요청이라 브라우저가 로그인 쿠키를 붙이고,
+  // 서버는 이 item 을 파싱만 한다 (서버의 비로그인 조회는 인스타가 막는다).
+  const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  async function igItem(code) {
+    const id = [...code.slice(0, 11)].reduce((n, c) => n * 64n + BigInt(B64.indexOf(c)), 0n).toString();
+    const csrf = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/)?.[1] ?? "";
+    const res = await fetch(`${location.origin}/api/v1/media/${id}/info/`, {
+      headers: { "x-ig-app-id": "936619743392459", "x-requested-with": "XMLHttpRequest", "x-csrftoken": csrf },
+    });
+    const item = (await res.json().catch(() => null))?.items?.[0];
+    if (item) return { item };
+    if (res.ok || res.status === 404) return { error: "게시물을 찾을 수 없어요 (비공개이거나 삭제됨)" };
+    if ([401, 403, 429].includes(res.status))
+      return { error: `인스타가 요청을 막았어요 (HTTP ${res.status}). 로그인 상태를 확인하고 몇 분 뒤 다시 시도하세요.` };
+    return { error: `인스타에서 게시물을 받지 못했어요 (HTTP ${res.status})` };
+  }
+
+  chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+    if (msg?.type !== "ig-item" || typeof msg.code !== "string") return;
+    igItem(msg.code).then(reply, (e) => reply({ error: `인스타에서 게시물을 받지 못했어요 (${e.message})` }));
+    return true;
+  });
+
   // 모으는 중 개수, 가져오기 진행 상황
   chrome.runtime.onMessage.addListener((msg) => {
     if (msg?.type === "collect-progress" && busy) flash("끝까지 내리며 모으는 중", `${msg.count}개`, true);
