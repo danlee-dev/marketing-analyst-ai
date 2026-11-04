@@ -54,7 +54,8 @@ export class IgError extends Error {
   }
 }
 
-export async function fetchIgPost(shortcode: string): Promise<IgPost> {
+// 인스타가 준 원본 item (서버 비로그인 조회). 익스텐션이 로그인된 탭에서 받은 item 은 parseIgItem 으로 바로 간다.
+export async function fetchIgItem(shortcode: string): Promise<Raw> {
   const csrf = await csrfToken();
   const body = new URLSearchParams({
     variables: JSON.stringify({
@@ -92,7 +93,10 @@ export async function fetchIgPost(shortcode: string): Promise<IgPost> {
     if (!item && json?.data) throw new IgError("게시물을 찾을 수 없어요 (비공개이거나 삭제됨)", 404);
   }
   if (!item) throw new IgError(`인스타가 요청을 막았어요 (HTTP ${lastStatus}). 잠시 뒤 다시 시도하세요.`, 429);
+  return item;
+}
 
+export function parseIgItem(item: Raw, shortcode: string): IgPost {
   const carousel: Raw[] | undefined = item.carousel_media;
   const media = carousel?.length ? carousel.map(toMedia) : [toMedia(item)];
   const type = carousel?.length ? "carousel" : media[0].kind === "video" ? "video" : "image";
@@ -119,6 +123,10 @@ export async function fetchIgPost(shortcode: string): Promise<IgPost> {
     media,
     thumbUrl: best(item.image_versions2?.candidates)?.url ?? media.find((m) => m.kind === "image")?.url ?? null,
   };
+}
+
+export async function fetchIgPost(shortcode: string): Promise<IgPost> {
+  return parseIgItem(await fetchIgItem(shortcode), shortcode);
 }
 
 export async function fetchCdn(url: string): Promise<Response> {
