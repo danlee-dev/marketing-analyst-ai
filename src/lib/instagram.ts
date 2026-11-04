@@ -54,7 +54,8 @@ export class IgError extends Error {
   }
 }
 
-export async function fetchIgPost(shortcode: string): Promise<IgPost> {
+// 인스타가 준 원본 item (서버 비로그인 조회). 익스텐션이 로그인된 탭에서 받은 item 은 parseIgItem 으로 바로 간다.
+export async function fetchIgItem(shortcode: string): Promise<Raw> {
   const csrf = await csrfToken();
   const body = new URLSearchParams({
     variables: JSON.stringify({
@@ -86,13 +87,24 @@ export async function fetchIgPost(shortcode: string): Promise<IgPost> {
       body,
     });
     lastStatus = res.status;
-    if (!res.ok) continue;
+    if (!res.ok) {
+      // 로그인 요구는 몇 초 기다려 풀리지 않고, 재시도는 막힌 IP 로 요청만 늘린다.
+      // 401 로 내려보내면 확장이 토큰 만료로 알고 연결을 끊으니 502 로.
+      const fail = await res.json().catch(() => null);
+      if (res.status === 401 || fail?.require_login)
+        throw new IgError("인스타가 로그인 없는 조회를 막고 있어요. 인스타에서 게시물을 열고 확장으로 저장해 주세요.", 502);
+      continue;
+    }
     const json = await res.json().catch(() => null);
     item = json?.data?.xdt_api__v1__media__shortcode__web_info?.items?.[0] ?? null;
     if (!item && json?.data) throw new IgError("게시물을 찾을 수 없어요 (비공개이거나 삭제됨)", 404);
   }
-  if (!item) throw new IgError(`인스타가 요청을 막았어요 (HTTP ${lastStatus}). 잠시 뒤 다시 시도하세요.`, 429);
+  if (!item)
+    throw new IgError(`인스타가 요청을 막았어요 (HTTP ${lastStatus}). 잠시 뒤 다시 시도하세요.`, lastStatus === 429 ? 429 : 502);
+  return item;
+}
 
+export function parseIgItem(item: Raw, shortcode: string): IgPost {
   const carousel: Raw[] | undefined = item.carousel_media;
   const media = carousel?.length ? carousel.map(toMedia) : [toMedia(item)];
   const type = carousel?.length ? "carousel" : media[0].kind === "video" ? "video" : "image";
@@ -119,6 +131,31 @@ export async function fetchIgPost(shortcode: string): Promise<IgPost> {
     media,
     thumbUrl: best(item.image_versions2?.candidates)?.url ?? media.find((m) => m.kind === "image")?.url ?? null,
   };
+}
+
+export async function fetchIgPost(shortcode: string): Promise<IgPost> {
+  return parseIgItem(await fetchIgItem(shortcode), shortcode);
+}
+
+// 확장이 로그인된 탭에서 받아 보낸 item. 서버가 그 URL 들을 내려받으니 같은 게시물인지, 미디어가 인스타 CDN 인지 확인한다.
+const IG_CDN = /(^|\.)(cdninstagram\.com|fbcdn\.net)$/;
+
+function isIgCdn(raw: string) {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && IG_CDN.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function parseClientIgItem(item: unknown, shortcode: string): IgPost {
+  if (!item || typeof item !== "object" || (item as Raw).code !== shortcode)
+    throw new IgError("다른 게시물의 정보가 왔어요", 400);
+  const ig = parseIgItem(item, shortcode);
+  for (const u of [...ig.media.map((m) => m.url), ig.thumbUrl, ig.profilePicUrl])
+    if (u && !isIgCdn(u)) throw new IgError("인스타 미디어 주소가 아니에요", 400);
+  return ig;
 }
 
 export async function fetchCdn(url: string): Promise<Response> {
