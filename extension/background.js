@@ -115,7 +115,7 @@ async function saveTab(tab, { withShot } = {}) {
   const d = detect(tab.url);
   if (!d) {
     await toast(tab.id, "이 페이지는 저장할 수 없어요", "error");
-    return { ok: false };
+    return { ok: false, error: "이 페이지는 저장할 수 없어요" };
   }
   try {
     const shot = (withShot ?? d.source === "web") ? await capture(tab.windowId).catch(() => undefined) : undefined;

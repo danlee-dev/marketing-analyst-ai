@@ -35,17 +35,25 @@
   .busy .spin { display:block; }
   @keyframes sp { to { transform: rotate(360deg); } }
   @keyframes in { from { opacity:0; transform: translateY(16px) scale(.92); } }
-  @media (prefers-reduced-motion: reduce) { .fab, .label { animation:none; transition:none; } }
+  .note { position:absolute; right:0; bottom:58px; width:max-content; max-width:300px; padding:10px 14px; border-radius:14px;
+    background:#c62a28; color:#fff; box-shadow:0 12px 36px rgb(0 0 0/.28);
+    font:500 13px/1.45 "RB Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif; letter-spacing:-.01em;
+    word-break:keep-all; display:none; animation: in .35s cubic-bezier(.05,.7,.1,1) both; }
+  .note.show { display:block; }
+  @media (prefers-reduced-motion: reduce) { .fab, .label, .note { animation:none; transition:none; } }
 </style>
+<div class="note" role="alert"></div>
 <button class="fab" type="button" aria-label="레퍼런스 보관함">
   <span class="mark"></span><span class="label"><span class="text"></span><span class="sub"></span></span><span class="spin"></span>
 </button>`;
   const btn = root.querySelector(".fab");
   const text = root.querySelector(".text");
   const sub = root.querySelector(".sub");
+  const note = root.querySelector(".note");
   let mode = null;
   let busy = false;
   let flashTimer = 0;
+  let noteTimer = 0;
 
   function render() {
     const m = isPost() ? "post" : isList() ? "list" : null;
@@ -66,25 +74,45 @@
     if (!keepOpen) flashTimer = setTimeout(() => (btn.classList.remove("open"), render()), 2600);
   }
 
+  // 에러 문구는 버튼 위 말풍선으로. background 의 페이지 토스트는 인스타 권한이 없어 이 버튼에서 시작한 저장에는 뜨지 않는다.
+  function showError(msg) {
+    note.textContent = msg;
+    note.classList.add("show");
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => note.classList.remove("show"), 7000);
+  }
+
+  // 확장을 업데이트하면 이 페이지에 남은 스크립트는 background 와 끊긴다. 그대로 두면 버튼이 계속 도는 상태로 멈춘다.
+  function send(msg, done) {
+    try {
+      chrome.runtime.sendMessage(msg, (r) => done(r ?? { error: "확장이 응답하지 않았어요. 페이지를 새로고침해 주세요." }));
+    } catch {
+      done({ error: "확장이 업데이트됐어요. 페이지를 새로고침해 주세요." });
+    }
+  }
+
   btn.addEventListener("click", (e) => {
     if (!e.isTrusted || busy || !mode) return;
     busy = true;
     btn.classList.add("busy", "open");
+    note.classList.remove("show");
     if (mode === "post") {
       flash("저장하는 중", "", true);
-      // 자세한 에러 문구는 background 가 페이지 토스트로 띄운다
-      chrome.runtime.sendMessage({ type: "fab-save", url: location.href }, (r) => {
+      send({ type: "fab-save", url: location.href }, (r) => {
         busy = false;
         btn.classList.remove("busy");
-        flash(r?.ok ? (r.existed ? "이미 있어요" : "저장했어요") : "저장하지 못했어요", "", false);
+        flash(r.ok ? (r.existed ? "이미 있어요" : "저장했어요") : "저장하지 못했어요", "", false);
+        if (!r.ok) showError(r.error || "저장하지 못했어요");
       });
     } else {
       flash("끝까지 내리며 모으는 중", "", true);
-      chrome.runtime.sendMessage({ type: "fab-collect" }, (r) => {
+      send({ type: "fab-collect" }, (r) => {
         busy = false;
         btn.classList.remove("busy");
-        if (r?.error) flash("가져오지 못했어요", "", false);
-        else flash(r?.found ? `새 게시물 ${r.added}개 가져오는 중` : "게시물을 못 찾았어요", r?.found ? `전체 ${r.found}개` : "", !!r?.added);
+        if (r.error) {
+          flash("가져오지 못했어요", "", false);
+          showError(r.error);
+        } else flash(r.found ? `새 게시물 ${r.added}개 가져오는 중` : "게시물을 못 찾았어요", r.found ? `전체 ${r.found}개` : "", !!r.added);
       });
     }
   });
