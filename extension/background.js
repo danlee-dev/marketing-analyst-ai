@@ -77,12 +77,28 @@ async function toast(tabId, text, tone) {
 }
 
 // ---------- 저장 ----------
-async function saveOne({ url, note, screenshot, transcribe, dest }) {
+// 인스타 게시물은 저장을 누른 탭(로그인된 인스타 탭)에서 원본 item 을 받아 같이 보낸다.
+// 그 탭에 content/instagram.js 가 없으면 item 없이 보내고, 서버가 직접 조회한다.
+async function igItemFrom(tabId, url) {
+  const d = detect(url);
+  if (d?.source !== "instagram" || tabId == null) return undefined;
+  let r;
+  try {
+    r = await chrome.tabs.sendMessage(tabId, { type: "ig-item", code: d.id });
+  } catch {
+    return undefined;
+  }
+  if (r?.error) throw new Error(r.error);
+  return r?.item;
+}
+
+async function saveOne({ url, note, screenshot, transcribe, dest, tabId }) {
   const target = dest || (await config()).dest;
   if (!target?.projectId) throw new Error("확장 아이콘을 눌러 저장 위치를 먼저 골라 주세요");
+  const igItem = await igItemFrom(tabId, url);
   const data = await api("/api/ext/save", {
     method: "POST",
-    body: JSON.stringify({ projectId: target.projectId, folderId: target.folderId || null, url, note, screenshot, transcribe: transcribe !== false }),
+    body: JSON.stringify({ projectId: target.projectId, folderId: target.folderId || null, url, note, screenshot, transcribe: transcribe !== false, igItem }),
   });
   await pushRecent(data.post, data.existed);
   return data;
@@ -94,16 +110,22 @@ async function pushRecent(post, existed) {
   await set({ recent: next });
 }
 
+// 결과를 돌려준다. 인스타 플로팅 버튼이 이걸로 "저장했어요" / "저장하지 못했어요" 를 고른다.
 async function saveTab(tab, { withShot } = {}) {
   const d = detect(tab.url);
-  if (!d) return toast(tab.id, "이 페이지는 저장할 수 없어요", "error");
+  if (!d) {
+    await toast(tab.id, "이 페이지는 저장할 수 없어요", "error");
+    return { ok: false, error: "이 페이지는 저장할 수 없어요" };
+  }
   try {
     const shot = (withShot ?? d.source === "web") ? await capture(tab.windowId).catch(() => undefined) : undefined;
     await toast(tab.id, "보관함에 저장하는 중");
-    const res = await saveOne({ url: tab.url, screenshot: shot });
+    const res = await saveOne({ url: tab.url, screenshot: shot, tabId: tab.id });
     await toast(tab.id, res.existed ? "이미 보관함에 있어요" : `저장했어요 · ${res.post.title}`);
+    return { ok: true, existed: !!res.existed };
   } catch (e) {
     await toast(tab.id, e.message, "error");
+    return { ok: false, error: e.message };
   }
 }
 
@@ -196,7 +218,7 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         return api("/api/ext/tree");
       case "save": {
         const shot = msg.screenshot && msg.windowId != null ? await capture(msg.windowId).catch(() => undefined) : undefined;
-        return saveOne({ url: msg.url, note: msg.note, screenshot: shot, transcribe: msg.transcribe, dest: msg.dest });
+        return saveOne({ url: msg.url, note: msg.note, screenshot: shot, transcribe: msg.transcribe, dest: msg.dest, tabId: msg.tabId });
       }
       case "check":
         return api("/api/ext/check", { method: "POST", body: JSON.stringify({ projectId: msg.projectId, urls: msg.urls }) });
@@ -213,8 +235,8 @@ chrome.runtime.onMessage.addListener((msg, sender, reply) => {
         chrome.alarms.clear("rb-pump");
         return { ok: true };
       case "fab-save":
-        if (sender.tab) await saveTab({ ...sender.tab, url: msg.url || sender.tab.url }, { withShot: false });
-        return { ok: true };
+        if (!sender.tab) return { ok: false };
+        return saveTab({ ...sender.tab, url: msg.url || sender.tab.url }, { withShot: false });
       case "fab-collect":
         if (!sender.tab) return { ok: false };
         try {
@@ -251,7 +273,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId === "rb-link" && info.linkUrl) {
       if (!detect(info.linkUrl)) return toast(tab.id, "저장할 수 없는 링크예요", "error");
       await toast(tab.id, "보관함에 저장하는 중");
-      const r = await saveOne({ url: info.linkUrl });
+      const r = await saveOne({ url: info.linkUrl, tabId: tab.id });
       await toast(tab.id, r.existed ? "이미 보관함에 있어요" : `저장했어요 · ${r.post.title}`);
     } else if (info.menuItemId === "rb-page") {
       await saveTab(tab);

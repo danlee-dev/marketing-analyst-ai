@@ -35,17 +35,25 @@
   .busy .spin { display:block; }
   @keyframes sp { to { transform: rotate(360deg); } }
   @keyframes in { from { opacity:0; transform: translateY(16px) scale(.92); } }
-  @media (prefers-reduced-motion: reduce) { .fab, .label { animation:none; transition:none; } }
+  .note { position:absolute; right:0; bottom:58px; width:max-content; max-width:300px; padding:10px 14px; border-radius:14px;
+    background:#c62a28; color:#fff; box-shadow:0 12px 36px rgb(0 0 0/.28);
+    font:500 13px/1.45 "RB Pretendard",-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif; letter-spacing:-.01em;
+    word-break:keep-all; display:none; animation: in .35s cubic-bezier(.05,.7,.1,1) both; }
+  .note.show { display:block; }
+  @media (prefers-reduced-motion: reduce) { .fab, .label, .note { animation:none; transition:none; } }
 </style>
+<div class="note" role="alert"></div>
 <button class="fab" type="button" aria-label="레퍼런스 보관함">
   <span class="mark"></span><span class="label"><span class="text"></span><span class="sub"></span></span><span class="spin"></span>
 </button>`;
   const btn = root.querySelector(".fab");
   const text = root.querySelector(".text");
   const sub = root.querySelector(".sub");
+  const note = root.querySelector(".note");
   let mode = null;
   let busy = false;
   let flashTimer = 0;
+  let noteTimer = 0;
 
   function render() {
     const m = isPost() ? "post" : isList() ? "list" : null;
@@ -66,26 +74,70 @@
     if (!keepOpen) flashTimer = setTimeout(() => (btn.classList.remove("open"), render()), 2600);
   }
 
+  // 에러 문구는 버튼 위 말풍선으로. background 의 페이지 토스트는 인스타 권한이 없어 이 버튼에서 시작한 저장에는 뜨지 않는다.
+  function showError(msg) {
+    note.textContent = msg;
+    note.classList.add("show");
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => note.classList.remove("show"), 7000);
+  }
+
+  // 확장을 업데이트하면 이 페이지에 남은 스크립트는 background 와 끊긴다. 그대로 두면 버튼이 계속 도는 상태로 멈춘다.
+  function send(msg, done) {
+    try {
+      chrome.runtime.sendMessage(msg, (r) => done(r ?? { error: "확장이 응답하지 않았어요. 페이지를 새로고침해 주세요." }));
+    } catch {
+      done({ error: "확장이 업데이트됐어요. 페이지를 새로고침해 주세요." });
+    }
+  }
+
   btn.addEventListener("click", (e) => {
     if (!e.isTrusted || busy || !mode) return;
     busy = true;
     btn.classList.add("busy", "open");
+    note.classList.remove("show");
     if (mode === "post") {
       flash("저장하는 중", "", true);
-      chrome.runtime.sendMessage({ type: "fab-save", url: location.href }, () => {
+      send({ type: "fab-save", url: location.href }, (r) => {
         busy = false;
         btn.classList.remove("busy");
-        flash("요청 보냄", "", false);
+        flash(r.ok ? (r.existed ? "이미 있어요" : "저장했어요") : "저장하지 못했어요", "", false);
+        if (!r.ok) showError(r.error || "저장하지 못했어요");
       });
     } else {
       flash("끝까지 내리며 모으는 중", "", true);
-      chrome.runtime.sendMessage({ type: "fab-collect" }, (r) => {
+      send({ type: "fab-collect" }, (r) => {
         busy = false;
         btn.classList.remove("busy");
-        if (r?.error) flash("가져오지 못했어요", "", false);
-        else flash(r?.found ? `새 게시물 ${r.added}개 가져오는 중` : "게시물을 못 찾았어요", r?.found ? `전체 ${r.found}개` : "", !!r?.added);
+        if (r.error) {
+          flash("가져오지 못했어요", "", false);
+          showError(r.error);
+        } else flash(r.found ? `새 게시물 ${r.added}개 가져오는 중` : "게시물을 못 찾았어요", r.found ? `전체 ${r.found}개` : "", !!r.added);
       });
     }
+  });
+
+  // 게시물 원본 item 을 로그인된 이 탭에서 받는다. 같은 출처 요청이라 브라우저가 로그인 쿠키를 붙이고,
+  // 서버는 이 item 을 파싱만 한다 (서버의 비로그인 조회는 인스타가 막는다).
+  const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  async function igItem(code) {
+    const id = [...code.slice(0, 11)].reduce((n, c) => n * 64n + BigInt(B64.indexOf(c)), 0n).toString();
+    const csrf = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/)?.[1] ?? "";
+    const res = await fetch(`${location.origin}/api/v1/media/${id}/info/`, {
+      headers: { "x-ig-app-id": "936619743392459", "x-requested-with": "XMLHttpRequest", "x-csrftoken": csrf },
+    });
+    const item = (await res.json().catch(() => null))?.items?.[0];
+    if (item) return { item };
+    if (res.ok || res.status === 404) return { error: "게시물을 찾을 수 없어요 (비공개이거나 삭제됨)" };
+    if ([401, 403, 429].includes(res.status))
+      return { error: `인스타가 요청을 막았어요 (HTTP ${res.status}). 로그인 상태를 확인하고 몇 분 뒤 다시 시도하세요.` };
+    return { error: `인스타에서 게시물을 받지 못했어요 (HTTP ${res.status})` };
+  }
+
+  chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
+    if (msg?.type !== "ig-item" || typeof msg.code !== "string") return;
+    igItem(msg.code).then(reply, (e) => reply({ error: `인스타에서 게시물을 받지 못했어요 (${e.message})` }));
+    return true;
   });
 
   // 모으는 중 개수, 가져오기 진행 상황
