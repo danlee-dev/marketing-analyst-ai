@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { Readability } from "@mozilla/readability";
 import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
-import { fetchIgPost, IgError } from "../instagram";
+import { fetchIgPost, IgError, parseClientIgItem } from "../instagram";
 import { autoTitle } from "../naming";
 import type { Account, Format, Source, Transcript, TranscriptLine } from "../types";
 import type { Detected } from "./detect";
@@ -37,10 +37,11 @@ export const UA =
 
 export class CollectError extends IgError {}
 
-export async function collect(d: Detected): Promise<Collected> {
+// igItem: 확장이 로그인된 인스타 탭에서 받아 온 원본 item (있으면 서버가 인스타에 묻지 않는다)
+export async function collect(d: Detected, igItem?: unknown): Promise<Collected> {
   switch (d.source) {
     case "instagram":
-      return instagram(d.id);
+      return instagram(d.id, igItem);
     case "x":
       return xPost(d.id);
     case "youtube":
@@ -63,8 +64,8 @@ async function getJson<T>(url: string, init?: RequestInit & { plainUA?: boolean 
 }
 
 // ---------- Instagram ----------
-async function instagram(code: string): Promise<Collected> {
-  const ig = await fetchIgPost(code);
+async function instagram(code: string, igItem?: unknown): Promise<Collected> {
+  const ig = igItem ? parseClientIgItem(igItem, code) : await fetchIgPost(code);
   return {
     source: "instagram",
     shortcode: ig.shortcode,

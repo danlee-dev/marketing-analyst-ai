@@ -19,6 +19,7 @@ export async function POST(request: Request) {
     note?: string;
     screenshot?: string;
     transcribe?: boolean;
+    igItem?: unknown;
   };
   const project = body.projectId ? await projectFor(a.sb, a.ws, body.projectId, body.folderId) : null;
   if (!project) return Response.json({ error: "저장할 프로젝트를 찾을 수 없어요" }, { status: 404 });
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   if (!d) return Response.json({ error: "저장할 수 없는 주소예요" }, { status: 400 });
 
   try {
-    const res = await ingestLink(a.sb, project, d, body.folderId || null, a.userId);
+    const res = await ingestLink(a.sb, project, d, body.folderId || null, a.userId, body.igItem);
     let post: Post = res.post;
     const patch: Partial<Post> = {};
 

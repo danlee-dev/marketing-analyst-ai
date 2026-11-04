@@ -137,6 +137,27 @@ export async function fetchIgPost(shortcode: string): Promise<IgPost> {
   return parseIgItem(await fetchIgItem(shortcode), shortcode);
 }
 
+// 확장이 로그인된 탭에서 받아 보낸 item. 서버가 그 URL 들을 내려받으니 같은 게시물인지, 미디어가 인스타 CDN 인지 확인한다.
+const IG_CDN = /(^|\.)(cdninstagram\.com|fbcdn\.net)$/;
+
+function isIgCdn(raw: string) {
+  try {
+    const u = new URL(raw);
+    return u.protocol === "https:" && IG_CDN.test(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function parseClientIgItem(item: unknown, shortcode: string): IgPost {
+  if (!item || typeof item !== "object" || (item as Raw).code !== shortcode)
+    throw new IgError("다른 게시물의 정보가 왔어요", 400);
+  const ig = parseIgItem(item, shortcode);
+  for (const u of [...ig.media.map((m) => m.url), ig.thumbUrl, ig.profilePicUrl])
+    if (u && !isIgCdn(u)) throw new IgError("인스타 미디어 주소가 아니에요", 400);
+  return ig;
+}
+
 export async function fetchCdn(url: string): Promise<Response> {
   const res = await fetch(url, { headers: { "User-Agent": UA }, cache: "no-store" });
   if (!res.ok || !res.body) throw new IgError(`미디어 다운로드 실패 (HTTP ${res.status})`);

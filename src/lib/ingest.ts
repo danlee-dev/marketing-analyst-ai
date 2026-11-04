@@ -69,13 +69,14 @@ export async function ingestLink(
   d: Detected,
   folderId: string | null,
   createdBy?: string,
+  igItem?: unknown,
 ): Promise<{ post: Post; existed?: boolean }> {
   const projectId = project.id;
   if (d.id) {
     const existing = await findExisting(sb, projectId, d.source, d.id);
     if (existing) return { post: existing, existed: true };
   }
-  const c = await collect(d);
+  const c = await collect(d, igItem);
   if (!d.id) {
     const existing = await findExisting(sb, projectId, c.source, c.shortcode);
     if (existing) return { post: existing, existed: true };
